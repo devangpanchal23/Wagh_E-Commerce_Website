@@ -18,6 +18,8 @@ import { About } from './pages/About';
 import { Contact } from './pages/Contact';
 import { Profile } from './pages/Profile';
 import { Admin } from './pages/Admin';
+import SignInPage from './pages/SignInPage';
+import SignUpPage from './pages/SignUpPage';
 
 // Context Providers
 import { ToastProvider } from './context/ToastContext';
@@ -101,7 +103,9 @@ function MainAppLayout() {
               </ProtectedRoute>
             }
           />
-          <Route path="/login" element={<Navigate to="/" state={{ openLogin: true }} replace />} />
+          <Route path="/sign-in/*" element={<SignInPage />} />
+          <Route path="/sign-up/*" element={<SignUpPage />} />
+          <Route path="/login" element={<Navigate to="/sign-in" replace />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>
       </main>

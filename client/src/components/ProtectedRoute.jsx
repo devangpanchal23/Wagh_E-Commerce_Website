@@ -1,5 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import { Show } from '@clerk/react';
 import { useAuth } from '../context/AuthContext';
 import { Zap } from 'lucide-react';
 
@@ -21,11 +22,10 @@ export function ProtectedRoute({ children }) {
   }
 
   if (!user) {
-    // Preserve attempted location so user can be redirected back after logging in
     return <Navigate to="/" state={{ from: location, openLogin: true }} replace />;
   }
 
-  return children;
+  return <Show when="signed-in">{children}</Show>;
 }
 
 export default ProtectedRoute;

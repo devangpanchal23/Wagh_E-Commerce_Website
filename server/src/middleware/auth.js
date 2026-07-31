@@ -7,33 +7,46 @@ const protect = async (req, res, next) => {
     token = req.headers.authorization.split(' ')[1];
   }
 
-  const firebaseUid = req.headers['x-user-uid'];
+  const clerkUid = req.headers['x-user-uid'] || req.headers['x-clerk-user-id'];
   const userEmail = req.headers['x-user-email'];
 
   try {
     let userFound = null;
 
-    // 1. Try resolving user by JWT token if present and valid
+    // 1. Try resolving user by JWT token if present
     if (token) {
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'wagh_super_secret_jwt_key_2026_premium_accessories');
-        userFound = await User.findById(decoded.id).select('-password');
+        const decoded = jwt.decode(token);
+        if (decoded && (decoded.sub || decoded.id || decoded.email)) {
+          const userId = decoded.id || decoded.sub;
+          userFound = await User.findOne({
+            $or: [
+              ...(userId ? [{ _id: userId }, { clerkId: userId }] : []),
+              ...(decoded.email ? [{ email: decoded.email }] : []),
+            ],
+          }).select('-password');
+        }
       } catch (tokenErr) {
-        // Token invalid or expired, fallback to firebase headers
+        // Token decode fallback
       }
     }
 
-    // 2. Fallback to Firebase user email / uid headers for strict per-user identification
-    if (!userFound && userEmail) {
-      const emailLower = userEmail.trim().toLowerCase();
-      userFound = await User.findOne({ email: emailLower });
+    // 2. Fallback to Clerk user email / uid headers for strict per-user identification
+    if (!userFound && (userEmail || clerkUid)) {
+      const emailLower = userEmail ? userEmail.trim().toLowerCase() : '';
+      if (emailLower) {
+        userFound = await User.findOne({ email: emailLower });
+      } else if (clerkUid) {
+        userFound = await User.findOne({ clerkId: clerkUid });
+      }
 
-      if (!userFound) {
-        // Auto-provision user in MongoDB for new Firebase Auth user
+      if (!userFound && emailLower) {
+        // Auto-provision user in MongoDB for new Clerk user
         userFound = await User.create({
           name: req.headers['x-user-name'] || emailLower.split('@')[0] || 'WAGH Customer',
           email: emailLower,
-          password: 'firebase_auth_user_' + Math.random().toString(36).substring(2),
+          clerkId: clerkUid || '',
+          password: 'clerk_auth_user_' + Math.random().toString(36).substring(2),
           role: 'customer',
         });
       }

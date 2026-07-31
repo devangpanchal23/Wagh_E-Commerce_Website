@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Search, ShoppingBag, User, Heart, Menu, ShieldAlert } from 'lucide-react';
+import { Show, SignInButton, UserButton } from '@clerk/react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
@@ -10,7 +11,6 @@ export function Navbar({ onOpenSearch, onOpenMobileDrawer, onOpenAuthModal }) {
   const { user, isAdmin } = useAuth();
   const { wishlist } = useWishlist();
   const location = useLocation();
-  const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -117,24 +117,35 @@ export function Navbar({ onOpenSearch, onOpenMobileDrawer, onOpenAuthModal }) {
             )}
           </Link>
 
-          {/* Profile / Sign In */}
-          <Link
-            to={user ? "/profile" : "#"}
-            onClick={handleProfileClick}
-            className="p-2.5 rounded-full text-wagh-dark/80 hover:text-wagh-teal hover:bg-wagh-teal/10 transition-colors flex items-center gap-1"
-            title={user ? displayName : 'Sign In'}
-          >
-            <User className="w-5 h-5" />
-            {user ? (
-              <span className="hidden md:inline text-xs font-semibold text-wagh-teal max-w-[100px] truncate">
-                {displayName.split(' ')[0]}
-              </span>
-            ) : (
+          {/* Profile / Sign In with Clerk Show pattern */}
+          <Show when="signed-out">
+            <button
+              onClick={onOpenAuthModal}
+              className="p-2.5 rounded-full text-wagh-dark/80 hover:text-wagh-teal hover:bg-wagh-teal/10 transition-colors flex items-center gap-1"
+              title="Sign In"
+            >
+              <User className="w-5 h-5" />
               <span className="hidden md:inline text-xs font-semibold text-wagh-dark/80 hover:text-wagh-teal">
                 Sign In
               </span>
-            )}
-          </Link>
+            </button>
+          </Show>
+
+          <Show when="signed-in">
+            <div className="flex items-center gap-2">
+              <Link
+                to="/profile"
+                className="p-2.5 rounded-full text-wagh-dark/80 hover:text-wagh-teal hover:bg-wagh-teal/10 transition-colors flex items-center gap-1"
+                title={displayName}
+              >
+                <User className="w-5 h-5" />
+                <span className="hidden md:inline text-xs font-semibold text-wagh-teal max-w-[100px] truncate">
+                  {displayName.split(' ')[0]}
+                </span>
+              </Link>
+              <UserButton afterSignOutUrl="/" />
+            </div>
+          </Show>
 
           {/* Cart Icon with Live Badge */}
           <Link
