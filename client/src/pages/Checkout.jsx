@@ -25,6 +25,20 @@ export function Checkout() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
 
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if (window.Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
     if (cartItems.length === 0) return;
@@ -55,6 +69,109 @@ export function Checkout() {
         total: grandTotal,
       };
 
+      if (paymentMethod === 'Razorpay') {
+        const loaded = await loadRazorpayScript();
+        if (!loaded || !window.Razorpay) {
+          addToast('Failed to load Razorpay payment SDK. Please check your connection.', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Step 1: Create Razorpay Order on Backend
+        const razorpayOrderRes = await fetchApi('/orders/create-razorpay-order', {
+          method: 'POST',
+          body: JSON.stringify({
+            amount: grandTotal,
+            currency: 'INR',
+            receipt: `rcpt_${Date.now()}`,
+          }),
+        });
+
+        if (!razorpayOrderRes || !razorpayOrderRes.order_id) {
+          throw new Error('Failed to create Razorpay payment order');
+        }
+
+        const razorpayKey = razorpayOrderRes.key || import.meta.env.VITE_RAZORPAY_KEY_ID;
+
+        // Step 2: Open Razorpay Checkout Modal
+        const options = {
+          key: razorpayKey,
+          amount: razorpayOrderRes.amount,
+          currency: razorpayOrderRes.currency || 'INR',
+          name: 'WAGH Mobile Accessories',
+          description: 'Payment for WAGH Accessories Order',
+          image: `${window.location.origin}/assets/branding/wagh-logo-2x.png`,
+          order_id: razorpayOrderRes.order_id,
+          handler: async function (response) {
+            // Step 3: Verify Payment Signature on Backend
+            try {
+              setIsSubmitting(true);
+              const verifyRes = await fetchApi('/orders/verify-razorpay-payment', {
+                method: 'POST',
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                }),
+              });
+
+              if (verifyRes && verifyRes.success) {
+                // Submit order to database after verified payment
+                const res = await fetchApi('/orders', {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    ...payload,
+                    paymentMethod: 'Razorpay',
+                    paymentStatus: 'Paid',
+                    razorpayOrderId: response.razorpay_order_id,
+                    razorpayPaymentId: response.razorpay_payment_id,
+                  }),
+                });
+
+                if (res.success) {
+                  setCompletedOrder(res.data);
+                  clearCart();
+                  addToast('Payment verified & order placed successfully!', 'success');
+                }
+              }
+            } catch (verifyErr) {
+              console.error('Signature verification error:', verifyErr);
+              addToast(verifyErr.message || 'Payment verification failed.', 'error');
+            } finally {
+              setIsSubmitting(false);
+            }
+          },
+          prefill: {
+            name: address.name || user?.name || user?.displayName || '',
+            email: user?.email || '',
+            contact: address.phone || '',
+          },
+          theme: {
+            color: '#0D9488',
+          },
+          modal: {
+            ondismiss: function () {
+              setIsSubmitting(false);
+              addToast('Razorpay payment modal closed', 'info');
+            },
+          },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', function (failureResponse) {
+          console.error('Razorpay Payment Failed:', failureResponse.error);
+          setIsSubmitting(false);
+          addToast(
+            `Payment Failed: ${failureResponse.error?.description || 'Transaction was unsuccessful'}`,
+            'error'
+          );
+        });
+
+        rzp.open();
+        return;
+      }
+
+      // COD Flow
       const res = await fetchApi('/orders', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -68,7 +185,9 @@ export function Checkout() {
     } catch (err) {
       addToast(err.message || 'Order failed to process', 'error');
     } finally {
-      setIsSubmitting(false);
+      if (paymentMethod !== 'Razorpay') {
+        setIsSubmitting(false);
+      }
     }
   };
 

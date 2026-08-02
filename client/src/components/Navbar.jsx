@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, ShoppingBag, User, Heart, Menu, ShieldAlert } from 'lucide-react';
 import { Show, SignInButton, UserButton } from '@clerk/react';
 import { useCart } from '../context/CartContext';
@@ -11,6 +11,7 @@ export function Navbar({ onOpenSearch, onOpenMobileDrawer, onOpenAuthModal }) {
   const { user, isAdmin } = useAuth();
   const { wishlist } = useWishlist();
   const location = useLocation();
+  const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -35,7 +36,6 @@ export function Navbar({ onOpenSearch, onOpenMobileDrawer, onOpenAuthModal }) {
     }
   };
 
-  const displayName = user?.displayName || user?.name || user?.email?.split('@')[0] || 'Account';
 
   return (
     <header className={`sticky top-0 z-40 transition-all duration-300 ${scrolled ? 'glass-nav shadow-md border-b border-wagh-border/60 py-3' : 'bg-wagh-bg py-4 border-b border-wagh-border/40'}`}>
@@ -83,17 +83,6 @@ export function Navbar({ onOpenSearch, onOpenMobileDrawer, onOpenAuthModal }) {
 
         {/* Right Icon Actions */}
         <div className="flex items-center gap-2 sm:gap-4">
-          {/* Admin badge link if user is admin */}
-          {isAdmin && (
-            <Link
-              to="/admin"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-wagh-gold/20 text-wagh-teal font-semibold text-xs rounded-full border border-wagh-gold/40 hover:bg-wagh-gold/30 transition-colors"
-            >
-              <ShieldAlert className="w-3.5 h-3.5" />
-              <span>Admin</span>
-            </Link>
-          )}
-
           {/* Search Trigger */}
           <button
             onClick={onOpenSearch}
@@ -132,19 +121,15 @@ export function Navbar({ onOpenSearch, onOpenMobileDrawer, onOpenAuthModal }) {
           </Show>
 
           <Show when="signed-in">
-            <div className="flex items-center gap-2">
-              <Link
-                to="/profile"
-                className="p-2.5 rounded-full text-wagh-dark/80 hover:text-wagh-teal hover:bg-wagh-teal/10 transition-colors flex items-center gap-1"
-                title={displayName}
-              >
-                <User className="w-5 h-5" />
-                <span className="hidden md:inline text-xs font-semibold text-wagh-teal max-w-[100px] truncate">
-                  {displayName.split(' ')[0]}
-                </span>
-              </Link>
-              <UserButton afterSignOutUrl="/" />
-            </div>
+            <UserButton afterSignOutUrl="/">
+              <UserButton.MenuItems>
+                <UserButton.Action
+                  label="My Profile & Orders"
+                  labelIcon={<User className="w-4 h-4" />}
+                  onClick={() => navigate('/profile')}
+                />
+              </UserButton.MenuItems>
+            </UserButton>
           </Show>
 
           {/* Cart Icon with Live Badge */}

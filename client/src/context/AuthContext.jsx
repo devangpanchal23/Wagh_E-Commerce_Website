@@ -23,7 +23,7 @@ export function AuthProvider({ children }) {
         clerkUser.username ||
         email.split('@')[0] ||
         'WAGH Customer';
-      const role = (clerkUser.publicMetadata && clerkUser.publicMetadata.role) || 'customer';
+      const role = 'customer';
       const uid = clerkUser.id;
 
       const profile = {
@@ -34,9 +34,20 @@ export function AuthProvider({ children }) {
         phoneNumber: clerkUser.primaryPhoneNumber?.phoneNumber || '',
         photoURL: clerkUser.imageUrl || '',
         emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified',
-        role,
+        role: 'customer',
       };
       setUserProfile(profile);
+
+      // Store in localStorage for API requests & backend auth synchronization
+      localStorage.setItem('wagh_clerk_uid', uid);
+      localStorage.setItem('wagh_clerk_email', email);
+      localStorage.setItem('wagh_clerk_name', displayName);
+
+      getToken().then((token) => {
+        if (token) {
+          localStorage.setItem('wagh_token', token);
+        }
+      }).catch(() => {});
 
       // Non-blocking Firestore user profile sync for compatibility with Firestore features
       const userRef = doc(db, 'users', uid);
@@ -46,20 +57,27 @@ export function AuthProvider({ children }) {
           uid,
           email,
           displayName,
-          role,
+          role: 'customer',
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
       ).catch((err) => console.error('Error syncing Firestore profile:', err));
     } else {
       setUserProfile(null);
+      localStorage.removeItem('wagh_token');
+      localStorage.removeItem('wagh_clerk_uid');
+      localStorage.removeItem('wagh_clerk_email');
+      localStorage.removeItem('wagh_clerk_name');
     }
-  }, [isLoaded, isSignedIn, clerkUser]);
+  }, [isLoaded, isSignedIn, clerkUser, getToken]);
 
   const logout = async () => {
     try {
       await clerkSignOut();
       localStorage.removeItem('wagh_token');
+      localStorage.removeItem('wagh_clerk_uid');
+      localStorage.removeItem('wagh_clerk_email');
+      localStorage.removeItem('wagh_clerk_name');
       setUserProfile(null);
       addToast('Logged out successfully', 'info');
     } catch (err) {

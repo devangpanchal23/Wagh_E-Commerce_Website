@@ -20,6 +20,11 @@ const userSchema = new mongoose.Schema({
     minlength: 6,
     select: false,
   },
+  clerkId: {
+    type: String,
+    default: '',
+    index: true,
+  },
   role: {
     type: String,
     enum: ['customer', 'admin'],
@@ -39,6 +44,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['male', 'female', 'other', 'prefer_not_to_say'],
     default: 'prefer_not_to_say',
+  },
+  birthdate: {
+    type: String,
+    trim: true,
+    default: '',
   },
   addresses: [{
     street: String,

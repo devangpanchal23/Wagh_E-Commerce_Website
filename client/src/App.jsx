@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { ClerkProvider } from '@clerk/react';
 import AnnouncementBar from './components/AnnouncementBar';
 import { Navbar } from './components/Navbar';
 import { SearchOverlay } from './components/SearchOverlay';
@@ -7,6 +8,7 @@ import { MobileDrawer } from './components/MobileDrawer';
 import { LoginModal } from './components/LoginModal';
 import { Footer } from './components/Footer';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { AdminGateway } from './components/AdminGateway';
 
 // Pages
 import { Home } from './pages/Home';
@@ -106,7 +108,14 @@ function MainAppLayout() {
           <Route path="/sign-in/*" element={<SignInPage />} />
           <Route path="/sign-up/*" element={<SignUpPage />} />
           <Route path="/login" element={<Navigate to="/sign-in" replace />} />
-          <Route path="/admin" element={<Admin />} />
+          <Route
+            path="/admin"
+            element={
+              <AdminGateway>
+                <Admin />
+              </AdminGateway>
+            }
+          />
         </Routes>
       </main>
 
@@ -115,16 +124,39 @@ function MainAppLayout() {
   );
 }
 
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+function ClerkProviderWithRoutes({ children }) {
+  const navigate = useNavigate();
+
+  return (
+    <ClerkProvider
+      publishableKey={PUBLISHABLE_KEY}
+      routerPush={(to) => navigate(to)}
+      routerReplace={(to) => navigate(to, { replace: true })}
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
+      afterSignOutUrl="/"
+    >
+      {children}
+    </ClerkProvider>
+  );
+}
+
 export default function App() {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <CartProvider>
-          <WishlistProvider>
-            <MainAppLayout />
-          </WishlistProvider>
-        </CartProvider>
-      </AuthProvider>
-    </ToastProvider>
+    <ClerkProviderWithRoutes>
+      <ToastProvider>
+        <AuthProvider>
+          <CartProvider>
+            <WishlistProvider>
+              <MainAppLayout />
+            </WishlistProvider>
+          </CartProvider>
+        </AuthProvider>
+      </ToastProvider>
+    </ClerkProviderWithRoutes>
   );
 }

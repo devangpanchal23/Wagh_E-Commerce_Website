@@ -11,6 +11,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const extraRoutes = require('./routes/extraRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -42,6 +43,7 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // API Routes (versioned /api/v1)
+app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/categories', categoryRoutes);
@@ -49,6 +51,12 @@ app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1', reviewRoutes);
 app.use('/api/v1', extraRoutes);
+
+// Razorpay Direct Alias Routes (Step 1 & Step 3 requirements)
+const { createRazorpayOrder, verifyRazorpayPayment } = require('./controllers/orderController');
+const { protect } = require('./middleware/auth');
+app.post('/api/create-order', protect, createRazorpayOrder);
+app.post('/api/verify-payment', protect, verifyRazorpayPayment);
 
 // Health check
 app.get('/api/v1/health', (req, res) => {

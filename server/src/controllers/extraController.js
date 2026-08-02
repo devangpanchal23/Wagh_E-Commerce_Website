@@ -48,12 +48,27 @@ exports.getAdminStats = async (req, res, next) => {
     const totalOrders = await Order.countDocuments();
     const totalProducts = await Product.countDocuments();
     const totalCustomers = await User.countDocuments({ role: 'customer' });
+    const completedOrders = await Order.countDocuments({ orderStatus: { $in: ['Delivered', 'Completed'] } });
     
-    const orders = await Order.find();
-    const totalRevenue = orders.reduce((acc, item) => acc + item.total, 0);
+    const allOrders = await Order.find();
+    const totalRevenue = allOrders.reduce((acc, item) => acc + (item.total || 0), 0);
+
+    // Calculate Last Year Sales and Completed Orders
+    const now = new Date();
+    const lastYear = now.getFullYear() - 1;
+    const startOfLastYear = new Date(lastYear, 0, 1);
+    const endOfLastYear = new Date(lastYear, 11, 31, 23, 59, 59);
+
+    const lastYearOrders = allOrders.filter(o => {
+      const d = new Date(o.createdAt);
+      return d >= startOfLastYear && d <= endOfLastYear;
+    });
+
+    const lastYearRevenue = lastYearOrders.reduce((acc, item) => acc + (item.total || 0), 0);
+    const lastYearCompletedOrders = lastYearOrders.filter(o => o.orderStatus === 'Delivered' || o.orderStatus === 'Completed').length;
 
     const pendingOrders = await Order.countDocuments({ orderStatus: 'Processing' });
-    const recentOrders = await Order.find().populate('user', 'name').sort({ createdAt: -1 }).limit(5);
+    const recentOrders = await Order.find().populate('user', 'name email').sort({ createdAt: -1 }).limit(10);
 
     res.json({
       success: true,
@@ -63,6 +78,10 @@ exports.getAdminStats = async (req, res, next) => {
         totalProducts,
         totalCustomers,
         pendingOrders,
+        completedOrders,
+        lastYearRevenue,
+        lastYearTotalOrders: lastYearOrders.length,
+        lastYearCompletedOrders,
         recentOrders,
       },
       message: 'Admin stats retrieved'

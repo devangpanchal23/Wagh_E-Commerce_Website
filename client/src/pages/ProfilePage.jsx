@@ -38,34 +38,56 @@ export function ProfilePage() {
     }
   }, [user]);
 
-  // Non-blocking background sync for user profile document
+  // Load user profile document from MongoDB database & Firestore
   const loadUserProfile = async () => {
     if (!user || !user.uid) return;
     setFetchError(null);
 
     try {
-      const userDocRef = doc(db, 'users', user.uid);
-      const snap = await getDoc(userDocRef);
-
-      if (snap.exists()) {
-        setProfile((prev) => ({ ...(prev || {}), ...snap.data() }));
-      } else {
-        // Document does not exist yet (first-time user login) -> create default user document
-        const initialDoc = {
-          uid: user.uid,
-          displayName: user.displayName || user.name || 'WAGH Member',
-          email: user.email || '',
-          phone: user.phoneNumber || user.phone || '',
-          profileImageUrl: user.photoURL || '',
-          addresses: [],
-          role: 'customer',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-
-        await setDoc(userDocRef, initialDoc);
-        setProfile(initialDoc);
+      let mongoData = {};
+      try {
+        const mongoRes = await fetchApi('/auth/profile');
+        if (mongoRes && mongoRes.success && mongoRes.data) {
+          mongoData = {
+            phone: mongoRes.data.mobileNumber || '',
+            phoneNumber: mongoRes.data.mobileNumber || '',
+            mobileNumber: mongoRes.data.mobileNumber || '',
+            birthdate: mongoRes.data.birthdate || '',
+            gender: mongoRes.data.gender || 'prefer_not_to_say',
+            addresses: mongoRes.data.addresses || [],
+          };
+        }
+      } catch (mErr) {
+        console.warn('MongoDB profile fetch notice:', mErr.message);
       }
+
+      let firestoreData = {};
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        const snap = await getDoc(userDocRef);
+        if (snap.exists()) {
+          firestoreData = snap.data();
+        }
+      } catch (fsErr) {
+        console.warn('Firestore profile fetch notice:', fsErr.message);
+      }
+
+      setProfile((prev) => {
+        const base = { ...(prev || {}) };
+        const merged = {
+          ...base,
+          ...firestoreData,
+          ...mongoData,
+        };
+        if (base.phone && !merged.phone) merged.phone = base.phone;
+        if (base.mobileNumber && !merged.mobileNumber) merged.mobileNumber = base.mobileNumber;
+        if (base.birthdate && !merged.birthdate) merged.birthdate = base.birthdate;
+        if (base.gender && (!merged.gender || merged.gender === 'prefer_not_to_say')) merged.gender = base.gender;
+        if (base.addresses && base.addresses.length > 0 && (!merged.addresses || merged.addresses.length === 0)) {
+          merged.addresses = base.addresses;
+        }
+        return merged;
+      });
     } catch (err) {
       console.error('Error loading private user profile:', err);
       if (!profile) {
@@ -102,7 +124,7 @@ export function ProfilePage() {
     }
   }, [activeTab, user]);
 
-  // Handler to update profile details (displayName, phone)
+  // Handler to update profile details (phone, birthdate, gender)
   const handleSaveDetails = async (updatedFields) => {
     if (!user || !user.uid) return { success: false, message: 'Not authenticated' };
 
@@ -110,13 +132,29 @@ export function ProfilePage() {
     setProfile((prev) => ({ ...prev, ...updatedFields }));
 
     try {
+      // Safe setDoc with merge: true (creates doc if missing, updates if present)
       const userDocRef = doc(db, 'users', user.uid);
       const payload = {
         ...updatedFields,
         updatedAt: new Date().toISOString(),
       };
 
-      await updateDoc(userDocRef, payload);
+      await setDoc(userDocRef, payload, { merge: true });
+
+      // Sync with MongoDB backend profile
+      try {
+        await fetchApi('/auth/profile', {
+          method: 'PUT',
+          body: JSON.stringify({
+            mobileNumber: updatedFields.phone || updatedFields.mobileNumber || '',
+            birthdate: updatedFields.birthdate || '',
+            gender: updatedFields.gender || 'prefer_not_to_say',
+          }),
+        });
+      } catch (mongoErr) {
+        console.warn('MongoDB user sync warning:', mongoErr.message);
+      }
+
       return { success: true };
     } catch (err) {
       console.error('Error saving profile details:', err);
@@ -137,7 +175,7 @@ export function ProfilePage() {
       updatedAt: new Date().toISOString(),
     };
 
-    await updateDoc(userDocRef, payload);
+    await setDoc(userDocRef, payload, { merge: true });
   };
 
   // Handler to save updated address array (Optimistic UI update)
@@ -145,7 +183,6 @@ export function ProfilePage() {
     if (!user || !user.uid) return { success: false, message: 'Not authenticated' };
 
     const previousAddresses = profile?.addresses || [];
-    // Optimistically update React state immediately
     setProfile((prev) => ({ ...prev, addresses: newAddresses }));
 
     try {
@@ -155,11 +192,22 @@ export function ProfilePage() {
         updatedAt: new Date().toISOString(),
       };
 
-      await updateDoc(userDocRef, payload);
+      await setDoc(userDocRef, payload, { merge: true });
+
+      try {
+        await fetchApi('/auth/profile', {
+          method: 'PUT',
+          body: JSON.stringify({
+            addresses: newAddresses,
+          }),
+        });
+      } catch (mongoErr) {
+        console.warn('MongoDB address save warning:', mongoErr.message);
+      }
+
       return { success: true };
     } catch (err) {
       console.error('Error saving address book:', err);
-      // Rollback on failure
       setProfile((prev) => ({ ...prev, addresses: previousAddresses }));
       return { success: false, message: err.message || 'Failed to save address.' };
     }
@@ -261,15 +309,6 @@ export function ProfilePage() {
           </div>
 
           <div className="py-2 flex items-center gap-3">
-            {isAdmin && (
-              <button
-                onClick={() => navigate('/admin')}
-                className="px-3.5 py-1.5 rounded-full bg-wagh-gold/20 text-wagh-teal font-mono-tag text-xs font-bold border border-wagh-gold/40 hover:bg-wagh-gold/30 transition-colors"
-              >
-                Admin Panel
-              </button>
-            )}
-
             <button
               onClick={logout}
               className="px-3.5 py-1.5 rounded-full bg-red-50 text-wagh-error font-mono-tag text-xs font-bold hover:bg-red-100 flex items-center gap-1.5 transition-colors"
@@ -333,7 +372,7 @@ export function ProfilePage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="px-3 py-1 rounded-full bg-wagh-teal/10 text-wagh-teal text-xs font-mono-tag font-bold">
+                        <span className="px-3.5 py-1 rounded-full bg-wagh-teal/10 text-wagh-teal text-xs font-mono-tag font-bold">
                           {order.orderStatus}
                         </span>
                         <span className="font-mono-tag font-extrabold text-wagh-dark">

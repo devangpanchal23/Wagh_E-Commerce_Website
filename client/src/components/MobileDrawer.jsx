@@ -89,15 +89,6 @@ export function MobileDrawer({ isOpen, onClose }) {
                 >
                   My Profile & Orders
                 </Link>
-                {isAdmin && (
-                  <Link
-                    to="/admin"
-                    onClick={onClose}
-                    className="block py-2.5 px-4 rounded-xl text-base font-semibold text-wagh-gold hover:bg-wagh-gold/10 transition-colors"
-                  >
-                    Admin Dashboard
-                  </Link>
-                )}
                 <button
                   onClick={() => {
                     logout();

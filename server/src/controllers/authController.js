@@ -90,10 +90,11 @@ exports.getUserProfile = async (req, res, next) => {
         name: user.name,
         email: user.email,
         mobileNumber: user.mobileNumber || '',
+        birthdate: user.birthdate || '',
         age: user.age || null,
         gender: user.gender || 'prefer_not_to_say',
         role: user.role,
-        addresses: user.addresses,
+        addresses: user.addresses || [],
       },
       message: 'Profile fetched successfully'
     });
@@ -111,12 +112,12 @@ exports.updateUserProfile = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const { name, email, mobileNumber, age, gender, password, addresses } = req.body;
+    const { name, email, mobileNumber, age, gender, birthdate, password, addresses } = req.body;
     const errors = {};
 
-    // Validate name
-    if (name !== undefined) {
-      if (!name || !name.trim()) {
+    // Validate name if provided
+    if (name !== undefined && name !== null) {
+      if (!name.trim()) {
         errors.name = 'Name cannot be empty';
       }
     }
@@ -137,14 +138,9 @@ exports.updateUserProfile = async (req, res, next) => {
     // Validate mobileNumber if provided
     if (mobileNumber !== undefined && mobileNumber !== null && mobileNumber.trim() !== '') {
       const cleanMobile = mobileNumber.trim();
-      const mobileRegex = /^[6-9]\d{9}$/;
+      const mobileRegex = /^\d{10}$/;
       if (!mobileRegex.test(cleanMobile)) {
-        errors.mobileNumber = 'Mobile number must be a valid 10-digit Indian phone number';
-      } else {
-        const mobileExists = await User.findOne({ mobileNumber: cleanMobile, _id: { $ne: user._id } });
-        if (mobileExists) {
-          errors.mobileNumber = 'Unable to update mobile number';
-        }
+        errors.mobileNumber = 'Mobile number must be a 10-digit phone number';
       }
     }
 
@@ -173,7 +169,7 @@ exports.updateUserProfile = async (req, res, next) => {
     }
 
     // Apply updates
-    if (name !== undefined) user.name = name.trim();
+    if (name !== undefined && name !== null) user.name = name.trim();
     let tokenRefreshed = null;
     if (email !== undefined && email.trim().toLowerCase() !== user.email) {
       user.email = email.trim().toLowerCase();
@@ -182,6 +178,7 @@ exports.updateUserProfile = async (req, res, next) => {
     if (mobileNumber !== undefined) user.mobileNumber = mobileNumber.trim();
     if (age !== undefined) user.age = age === '' || age === null ? null : Number(age);
     if (gender !== undefined) user.gender = gender;
+    if (birthdate !== undefined) user.birthdate = birthdate;
     if (addresses !== undefined) user.addresses = addresses;
     if (password) user.password = password;
 
@@ -194,6 +191,7 @@ exports.updateUserProfile = async (req, res, next) => {
         name: updatedUser.name,
         email: updatedUser.email,
         mobileNumber: updatedUser.mobileNumber || '',
+        birthdate: updatedUser.birthdate || '',
         age: updatedUser.age || null,
         gender: updatedUser.gender || 'prefer_not_to_say',
         role: updatedUser.role,

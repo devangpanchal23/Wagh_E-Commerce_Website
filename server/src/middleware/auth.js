@@ -34,6 +34,7 @@ const protect = async (req, res, next) => {
     // 2. Fallback to Clerk user email / uid headers for strict per-user identification
     if (!userFound && (userEmail || clerkUid)) {
       const emailLower = userEmail ? userEmail.trim().toLowerCase() : '';
+
       if (emailLower) {
         userFound = await User.findOne({ email: emailLower });
       } else if (clerkUid) {
@@ -49,6 +50,9 @@ const protect = async (req, res, next) => {
           password: 'clerk_auth_user_' + Math.random().toString(36).substring(2),
           role: 'customer',
         });
+      } else if (userFound && clerkUid && !userFound.clerkId) {
+        userFound.clerkId = clerkUid;
+        await userFound.save();
       }
     }
 
