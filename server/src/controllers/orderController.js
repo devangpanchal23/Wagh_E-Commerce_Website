@@ -39,7 +39,10 @@ exports.createOrder = async (req, res, next) => {
 
 exports.getMyOrders = async (req, res, next) => {
   try {
-    const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
+    const orders = await Order.find({ user: req.user._id })
+      .select('orderId items shippingAddress paymentMethod paymentStatus orderStatus subtotal shippingFee discount total createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
     res.json({
       success: true,
       data: orders,

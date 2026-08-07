@@ -216,21 +216,21 @@ export function AddressBook({ addresses = [], onSaveAddresses }) {
                   : 'border-wagh-border hover:border-wagh-teal/50 bg-white'
               }`}
             >
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-md bg-wagh-dark text-white font-mono-tag font-bold text-[11px] uppercase tracking-wider">
+              <div className="space-y-2 min-w-0 w-full">
+                <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                    <span className="px-2.5 py-0.5 rounded-md bg-wagh-dark text-white font-mono-tag font-bold text-[10px] sm:text-[11px] uppercase tracking-wider shrink-0">
                       {addr.label}
                     </span>
                     {addr.isDefault && (
-                      <span className="px-2.5 py-0.5 rounded-md bg-wagh-gold text-wagh-dark font-mono-tag font-bold text-[11px] uppercase tracking-wider flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-md bg-wagh-gold text-wagh-dark font-mono-tag font-bold text-[10px] sm:text-[11px] uppercase tracking-wider flex items-center gap-1 shrink-0">
                         <Star className="w-3 h-3 fill-wagh-dark" />
                         <span>Default</span>
                       </span>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0 ml-auto sm:ml-0">
                     <button
                       type="button"
                       onClick={() => handleOpenEditModal(addr)}

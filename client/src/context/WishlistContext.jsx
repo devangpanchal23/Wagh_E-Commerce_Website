@@ -1,6 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
 import { fetchApi } from '../api';
@@ -8,14 +6,14 @@ import { fetchApi } from '../api';
 const WishlistContext = createContext();
 
 export function WishlistProvider({ children }) {
-  const { user } = useAuth();
+  const { user, updateUserProfile } = useAuth();
   const { addToast } = useToast();
 
   const [wishlistIds, setWishlistIds] = useState([]);
   const [wishlistProducts, setWishlistProducts] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Synchronize wishlistIds state with user's Firestore profile data
+  // Synchronize wishlistIds state with user's profile data
   useEffect(() => {
     if (user && Array.isArray(user.wishlist)) {
       setWishlistIds(user.wishlist.map(String));
@@ -73,7 +71,7 @@ export function WishlistProvider({ children }) {
     const productName = product.name || 'Item';
     const isCurrentlyLiked = wishlistIds.includes(productId);
 
-    // 1. Optimistic UI update: toggle heart icon immediately
+    // Optimistic UI update: toggle heart icon immediately
     const prevIds = [...wishlistIds];
     const newIds = isCurrentlyLiked
       ? prevIds.filter((id) => id !== productId)
@@ -86,20 +84,15 @@ export function WishlistProvider({ children }) {
       addToast(`Added "${productName}" to wishlist`, 'success');
     }
 
-    // 2. Background Firestore write using arrayUnion / arrayRemove
+    // Save updated wishlist array to MongoDB profile
     try {
-      const userRef = doc(db, 'users', user.uid);
-      const updatePayload = {
-        wishlist: isCurrentlyLiked ? arrayRemove(productId) : arrayUnion(productId),
-        updatedAt: new Date().toISOString(),
-      };
-
-      await updateDoc(userRef, updatePayload);
+      if (updateUserProfile) {
+        await updateUserProfile({ wishlist: newIds });
+      }
     } catch (err) {
-      console.error('Firestore wishlist update error:', err);
-      // Rollback on failure
+      console.error('Wishlist sync error:', err);
       setWishlistIds(prevIds);
-      addToast('Failed to sync wishlist to cloud.', 'error');
+      addToast('Failed to sync wishlist.', 'error');
     }
   };
 

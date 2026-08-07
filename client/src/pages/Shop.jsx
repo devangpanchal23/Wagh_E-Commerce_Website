@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Filter, SlidersHorizontal, ChevronRight, X, RotateCcw } from 'lucide-react';
 import { ProductCard } from '../components/ProductCard';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
+import { PriceRangeFilter } from '../components/PriceRangeFilter';
 import { fetchApi } from '../api';
 
 export function Shop() {
@@ -26,6 +27,7 @@ export function Shop() {
   const [minPrice, setMinPrice] = useState(minPriceParam);
   const [maxPrice, setMaxPrice] = useState(maxPriceParam);
   const [inStockOnly, setInStockOnly] = useState(inStockParam);
+  const [maxLimit, setMaxLimit] = useState(2000);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -61,6 +63,9 @@ export function Shop() {
           setProducts(res.data.products);
           setTotalCount(res.data.total);
           setTotalPages(res.data.pages);
+          if (res.data.maxProductPrice) {
+            setMaxLimit(res.data.maxProductPrice);
+          }
         }
       } catch (err) {
         console.error('Products load error', err);
@@ -212,33 +217,18 @@ export function Shop() {
           <hr className="border-wagh-border" />
 
           {/* Price Range Filter */}
-          <div className="space-y-3">
-            <h4 className="font-mono-tag text-xs font-bold uppercase tracking-wider text-wagh-muted">Price Range (₹)</h4>
-            <form onSubmit={handleApplyPrice} className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="number"
-                  placeholder="Min ₹"
-                  value={minPrice}
-                  onChange={(e) => setMinPrice(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-wagh-border text-xs font-mono-tag focus:outline-none focus:ring-2 focus:ring-wagh-teal"
-                />
-                <input
-                  type="number"
-                  placeholder="Max ₹"
-                  value={maxPrice}
-                  onChange={(e) => setMaxPrice(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-wagh-border text-xs font-mono-tag focus:outline-none focus:ring-2 focus:ring-wagh-teal"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full py-2 rounded-xl bg-wagh-dark text-white font-mono-tag text-xs font-bold hover:bg-wagh-teal transition-colors"
-              >
-                Apply Price
-              </button>
-            </form>
-          </div>
+          <PriceRangeFilter
+            minPrice={minPrice}
+            maxPrice={maxPrice}
+            minLimit={0}
+            maxLimit={maxLimit}
+            currencySymbol="₹"
+            onApply={({ minPrice: newMin, maxPrice: newMax }) => {
+              setMinPrice(newMin);
+              setMaxPrice(newMax);
+              updateFilters({ minPrice: newMin, maxPrice: newMax });
+            }}
+          />
         </aside>
 
         {/* PRODUCT GRID SECTION */}
@@ -324,6 +314,19 @@ export function Shop() {
                   </button>
                 ))}
               </div>
+
+              <PriceRangeFilter
+                minPrice={minPrice}
+                maxPrice={maxPrice}
+                minLimit={0}
+                maxLimit={maxLimit}
+                currencySymbol="₹"
+                onApply={({ minPrice: newMin, maxPrice: newMax }) => {
+                  setMinPrice(newMin);
+                  setMaxPrice(newMax);
+                  updateFilters({ minPrice: newMin, maxPrice: newMax });
+                }}
+              />
 
               <button
                 onClick={() => {

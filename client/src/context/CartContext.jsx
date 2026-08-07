@@ -6,45 +6,67 @@ import { syncCartOnLogin, saveUserCartToFirestore } from '../utils/cartSync';
 const CartContext = createContext();
 
 export function CartProvider({ children }) {
+  const { user } = useAuth();
+  const { addToast } = useToast();
+  const [isHydrated, setIsHydrated] = useState(false);
+
   const [cartItems, setCartItems] = useState(() => {
     try {
-      const local = localStorage.getItem('wagh_cart');
-      return local ? JSON.parse(local) : [];
+      const uid = localStorage.getItem('wagh_clerk_uid');
+      if (uid) {
+        const userSaved = localStorage.getItem(`wagh_cart_${uid}`);
+        if (userSaved) return JSON.parse(userSaved);
+      }
+      const guestSaved = localStorage.getItem('wagh_guest_cart');
+      return guestSaved ? JSON.parse(guestSaved) : [];
     } catch {
       return [];
     }
   });
 
-  const { user } = useAuth();
-  const { addToast } = useToast();
-
-  // Save cart to localStorage whenever cartItems change
+  // User-isolated cart synchronization on auth change (login / switch / logout)
   useEffect(() => {
+    let isMounted = true;
+
+    if (user?.uid) {
+      const performSync = async () => {
+        const syncedCart = await syncCartOnLogin(user);
+        if (isMounted) {
+          setCartItems(syncedCart);
+          setIsHydrated(true);
+        }
+      };
+      performSync();
+    } else {
+      const guestSaved = localStorage.getItem('wagh_guest_cart');
+      if (isMounted) {
+        setCartItems(guestSaved ? JSON.parse(guestSaved) : []);
+        setIsHydrated(true);
+      }
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.uid]);
+
+  // Persist cart to user-scoped storage key ONLY AFTER hydration completes
+  useEffect(() => {
+    if (!isHydrated) return;
+
     try {
-      localStorage.setItem('wagh_cart', JSON.stringify(cartItems));
+      if (user?.uid) {
+        localStorage.setItem(`wagh_cart_${user.uid}`, JSON.stringify(cartItems));
+        localStorage.removeItem('wagh_guest_cart');
+        localStorage.removeItem('wagh_cart');
+      } else {
+        localStorage.setItem('wagh_guest_cart', JSON.stringify(cartItems));
+        localStorage.removeItem('wagh_cart');
+      }
     } catch (e) {
       console.error('Error saving cart to localStorage:', e);
     }
-  }, [cartItems]);
-
-  // Sync guest cart with Firestore on user login
-  useEffect(() => {
-    if (user?.uid) {
-      const performSync = async () => {
-        const mergedCart = await syncCartOnLogin(user, cartItems);
-        setCartItems(mergedCart);
-      };
-      performSync();
-    }
-  }, [user?.uid]);
-
-  // Helper to update state & sync to Firestore if user logged in
-  const updateCartAndPersist = (newCartItems) => {
-    setCartItems(newCartItems);
-    if (user?.uid) {
-      saveUserCartToFirestore(user.uid, newCartItems);
-    }
-  };
+  }, [cartItems, user?.uid, isHydrated]);
 
   const addToCart = (product, qty = 1) => {
     const pId = product._id || product.id || product;
@@ -115,8 +137,11 @@ export function CartProvider({ children }) {
   const clearCart = () => {
     setCartItems([]);
     if (user?.uid) {
+      localStorage.removeItem(`wagh_cart_${user.uid}`);
       saveUserCartToFirestore(user.uid, []);
     }
+    localStorage.removeItem('wagh_guest_cart');
+    localStorage.removeItem('wagh_cart');
   };
 
   // Computations

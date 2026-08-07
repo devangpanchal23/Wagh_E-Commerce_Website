@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
 import { Camera, Loader2, CheckCircle2, User as UserIcon } from 'lucide-react';
-import { storage, ref, uploadBytesResumable, getDownloadURL } from '../../firebase';
 import { useToast } from '../../context/ToastContext';
 
 // Client-side image resize / compression helper
@@ -76,46 +75,31 @@ export function ProfileHeader({ profile, user, onUpdateProfileImage }) {
       return;
     }
 
-    // Reset file input value so re-selecting same file works
     e.target.value = '';
 
     try {
       setUploading(true);
-      setUploadProgress(15);
+      setUploadProgress(30);
 
-      // Client-side compression to max 800px, 0.8 quality
-      const compressedFile = await compressImage(file, 800, 800, 0.8);
-      setUploadProgress(35);
+      const compressedFile = await compressImage(file, 600, 600, 0.75);
+      setUploadProgress(60);
 
-      const storageRef = ref(storage, `profileImages/${user.uid}/avatar_${Date.now()}.jpg`);
-      const uploadTask = uploadBytesResumable(storageRef, compressedFile);
-
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 60) + 35;
-          setUploadProgress(progress);
-        },
-        (error) => {
-          console.error('Storage upload error:', error);
-          addToast('Failed to upload image: ' + error.message, 'error');
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        try {
+          const dataUrl = reader.result;
+          setUploadProgress(90);
+          await onUpdateProfileImage(dataUrl);
+          addToast('Profile photo updated successfully!', 'success');
+        } catch (err) {
+          console.error('Profile image update error:', err);
+          addToast('Error saving profile photo.', 'error');
+        } finally {
           setUploading(false);
           setUploadProgress(0);
-        },
-        async () => {
-          try {
-            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-            await onUpdateProfileImage(downloadURL);
-            addToast('Profile photo updated successfully!', 'success');
-          } catch (err) {
-            console.error('Firestore image update error:', err);
-            addToast('Error saving profile image URL to document.', 'error');
-          } finally {
-            setUploading(false);
-            setUploadProgress(0);
-          }
         }
-      );
+      };
+      reader.readAsDataURL(compressedFile);
     } catch (err) {
       console.error('Image upload flow error:', err);
       addToast('Error preparing image for upload: ' + err.message, 'error');
@@ -125,11 +109,11 @@ export function ProfileHeader({ profile, user, onUpdateProfileImage }) {
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-wagh-border p-6 sm:p-8 shadow-soft flex flex-col sm:flex-row items-center justify-between gap-6">
-      <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
+    <div className="bg-white rounded-3xl border border-wagh-border p-5 sm:p-8 shadow-soft flex flex-col sm:flex-row items-center justify-between gap-6 overflow-hidden w-full max-w-full">
+      <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 text-center sm:text-left min-w-0 w-full">
         {/* Circular Avatar + Upload Trigger */}
         <div className="relative group shrink-0">
-          <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-wagh-teal/20 shadow-md bg-gray-100 flex items-center justify-center relative">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-4 border-wagh-teal/20 shadow-md bg-gray-100 flex items-center justify-center relative">
             {currentImageUrl ? (
               <img
                 src={currentImageUrl}
@@ -137,15 +121,15 @@ export function ProfileHeader({ profile, user, onUpdateProfileImage }) {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full bg-wagh-teal text-wagh-gold text-3xl font-editorial font-bold flex items-center justify-center uppercase">
-                {displayName.charAt(0) || <UserIcon className="w-10 h-10" />}
+              <div className="w-full h-full bg-wagh-teal text-wagh-gold text-2xl sm:text-3xl font-editorial font-bold flex items-center justify-center uppercase">
+                {displayName.charAt(0) || <UserIcon className="w-8 h-8 sm:w-10 sm:h-10" />}
               </div>
             )}
 
             {/* Upload Overlay Loader */}
             {uploading && (
               <div className="absolute inset-0 bg-wagh-dark/70 backdrop-blur-xs flex flex-col items-center justify-center text-white p-2">
-                <Loader2 className="w-6 h-6 animate-spin text-wagh-gold mb-1" />
+                <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-wagh-gold mb-1" />
                 <span className="text-[10px] font-mono-tag font-bold">{uploadProgress}%</span>
               </div>
             )}
@@ -156,10 +140,10 @@ export function ProfileHeader({ profile, user, onUpdateProfileImage }) {
             type="button"
             onClick={handleSelectFile}
             disabled={uploading}
-            className="absolute bottom-0 right-0 p-2 rounded-full bg-wagh-teal text-white border-2 border-white shadow-lg hover:bg-wagh-teal-dark hover:scale-110 transition-all duration-200 focus:outline-none disabled:opacity-50"
+            className="absolute bottom-0 right-0 p-1.5 sm:p-2 rounded-full bg-wagh-teal text-white border-2 border-white shadow-lg hover:bg-wagh-teal-dark hover:scale-110 transition-all duration-200 focus:outline-none disabled:opacity-50"
             title="Upload/Change Profile Photo"
           >
-            <Camera className="w-4 h-4" />
+            <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
 
           <input
@@ -172,22 +156,24 @@ export function ProfileHeader({ profile, user, onUpdateProfileImage }) {
         </div>
 
         {/* User Info */}
-        <div className="space-y-1">
-          <div className="flex items-center justify-center sm:justify-start gap-2">
-            <h2 className="font-editorial text-2xl sm:text-3xl font-extrabold text-wagh-dark leading-tight">
+        <div className="space-y-1.5 min-w-0 flex-1 w-full max-w-full overflow-hidden">
+          <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap min-w-0">
+            <h2 className="font-editorial text-xl sm:text-2xl md:text-3xl font-extrabold text-wagh-dark leading-tight truncate">
               {displayName}
             </h2>
-            <CheckCircle2 className="w-5 h-5 text-wagh-teal shrink-0" title="Private Account" />
+            <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-wagh-teal shrink-0" title="Private Account" />
           </div>
           
-          <p className="text-xs font-mono-tag text-wagh-muted flex items-center justify-center sm:justify-start gap-1">
-            <span>Email:</span>
-            <span className="font-semibold text-wagh-dark bg-gray-100 px-2 py-0.5 rounded">{email}</span>
-            <span className="text-[10px] text-wagh-muted italic">(Read-only)</span>
-          </p>
+          <div className="text-xs font-mono-tag text-wagh-muted flex flex-wrap items-center justify-center sm:justify-start gap-1.5 max-w-full">
+            <span className="shrink-0">Email:</span>
+            <span className="font-semibold text-wagh-dark bg-gray-100 px-2 py-0.5 rounded truncate max-w-[200px] sm:max-w-xs md:max-w-md">
+              {email}
+            </span>
+            <span className="text-[10px] text-wagh-muted italic shrink-0">(Read-only)</span>
+          </div>
 
           {uploading && (
-            <div className="w-full max-w-xs bg-gray-100 rounded-full h-1.5 mt-2 overflow-hidden">
+            <div className="w-full max-w-xs bg-gray-100 rounded-full h-1.5 mt-2 overflow-hidden mx-auto sm:mx-0">
               <div
                 className="bg-wagh-teal h-full transition-all duration-300"
                 style={{ width: `${uploadProgress}%` }}
@@ -197,8 +183,8 @@ export function ProfileHeader({ profile, user, onUpdateProfileImage }) {
         </div>
       </div>
 
-      <div className="text-right">
-        <span className="px-3.5 py-1.5 rounded-full bg-wagh-gold/20 text-wagh-teal text-xs font-mono-tag font-bold tracking-wider uppercase border border-wagh-gold/40">
+      <div className="text-center sm:text-right shrink-0">
+        <span className="px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-wagh-gold/20 text-wagh-teal text-[11px] sm:text-xs font-mono-tag font-bold tracking-wider uppercase border border-wagh-gold/40 inline-block">
           Private Workspace
         </span>
       </div>

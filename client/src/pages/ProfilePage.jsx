@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { ProfileHeader } from '../components/profile/ProfileHeader';
@@ -13,96 +11,24 @@ import { ProductCard } from '../components/ProductCard';
 import { fetchApi } from '../api';
 
 export function ProfilePage() {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, profileLoading, profileError, updateUserProfile, refreshProfile } = useAuth();
   const { wishlist } = useWishlist();
   const navigate = useNavigate();
   const { addToast } = useToast();
 
-  const [profile, setProfile] = useState(() => user || null);
-  const [loading, setLoading] = useState(() => !user);
-  const [fetchError, setFetchError] = useState(null);
+  const [profile, setProfile] = useState(null);
 
   // Tab state: 'profile' | 'orders' | 'wishlist'
   const [activeTab, setActiveTab] = useState('profile');
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
 
-  // Keep profile in sync with AuthContext user data immediately
+  // Sync local profile state from AuthContext once MongoDB data is loaded
   useEffect(() => {
     if (user) {
-      setProfile((prev) => ({
-        ...user,
-        ...(prev || {}),
-      }));
-      setLoading(false);
+      setProfile(user);
     }
   }, [user]);
-
-  // Load user profile document from MongoDB database & Firestore
-  const loadUserProfile = async () => {
-    if (!user || !user.uid) return;
-    setFetchError(null);
-
-    try {
-      let mongoData = {};
-      try {
-        const mongoRes = await fetchApi('/auth/profile');
-        if (mongoRes && mongoRes.success && mongoRes.data) {
-          mongoData = {
-            phone: mongoRes.data.mobileNumber || '',
-            phoneNumber: mongoRes.data.mobileNumber || '',
-            mobileNumber: mongoRes.data.mobileNumber || '',
-            birthdate: mongoRes.data.birthdate || '',
-            gender: mongoRes.data.gender || 'prefer_not_to_say',
-            addresses: mongoRes.data.addresses || [],
-          };
-        }
-      } catch (mErr) {
-        console.warn('MongoDB profile fetch notice:', mErr.message);
-      }
-
-      let firestoreData = {};
-      try {
-        const userDocRef = doc(db, 'users', user.uid);
-        const snap = await getDoc(userDocRef);
-        if (snap.exists()) {
-          firestoreData = snap.data();
-        }
-      } catch (fsErr) {
-        console.warn('Firestore profile fetch notice:', fsErr.message);
-      }
-
-      setProfile((prev) => {
-        const base = { ...(prev || {}) };
-        const merged = {
-          ...base,
-          ...firestoreData,
-          ...mongoData,
-        };
-        if (base.phone && !merged.phone) merged.phone = base.phone;
-        if (base.mobileNumber && !merged.mobileNumber) merged.mobileNumber = base.mobileNumber;
-        if (base.birthdate && !merged.birthdate) merged.birthdate = base.birthdate;
-        if (base.gender && (!merged.gender || merged.gender === 'prefer_not_to_say')) merged.gender = base.gender;
-        if (base.addresses && base.addresses.length > 0 && (!merged.addresses || merged.addresses.length === 0)) {
-          merged.addresses = base.addresses;
-        }
-        return merged;
-      });
-    } catch (err) {
-      console.error('Error loading private user profile:', err);
-      if (!profile) {
-        setFetchError(err.message || 'Failed to load your profile data.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (user?.uid) {
-      loadUserProfile();
-    }
-  }, [user?.uid]);
 
   // Load orders when switching to orders tab
   useEffect(() => {
@@ -124,38 +50,27 @@ export function ProfilePage() {
     }
   }, [activeTab, user]);
 
-  // Handler to update profile details (phone, birthdate, gender)
+  // Handler to update profile details (email, phone, birthdate, age, gender)
   const handleSaveDetails = async (updatedFields) => {
-    if (!user || !user.uid) return { success: false, message: 'Not authenticated' };
+    if (!user) return { success: false, message: 'Not authenticated' };
 
     const previousProfile = profile;
     setProfile((prev) => ({ ...prev, ...updatedFields }));
 
     try {
-      // Safe setDoc with merge: true (creates doc if missing, updates if present)
-      const userDocRef = doc(db, 'users', user.uid);
-      const payload = {
-        ...updatedFields,
-        updatedAt: new Date().toISOString(),
-      };
-
-      await setDoc(userDocRef, payload, { merge: true });
-
-      // Sync with MongoDB backend profile
-      try {
-        await fetchApi('/auth/profile', {
-          method: 'PUT',
-          body: JSON.stringify({
-            mobileNumber: updatedFields.phone || updatedFields.mobileNumber || '',
-            birthdate: updatedFields.birthdate || '',
-            gender: updatedFields.gender || 'prefer_not_to_say',
-          }),
-        });
-      } catch (mongoErr) {
-        console.warn('MongoDB user sync warning:', mongoErr.message);
+      const res = await updateUserProfile(updatedFields);
+      if (res?.success) {
+        setProfile((prev) => ({
+          ...prev,
+          ...updatedFields,
+          phone: updatedFields.phone || prev?.phone || '',
+          phoneNumber: updatedFields.phone || prev?.phoneNumber || '',
+          mobileNumber: updatedFields.phone || prev?.mobileNumber || '',
+        }));
+      } else {
+        setProfile(previousProfile);
       }
-
-      return { success: true };
+      return res;
     } catch (err) {
       console.error('Error saving profile details:', err);
       setProfile(previousProfile);
@@ -165,20 +80,17 @@ export function ProfilePage() {
 
   // Handler to update profile image URL
   const handleUpdateProfileImage = async (imageUrl) => {
-    if (!user || !user.uid) return;
+    if (!user) return;
 
     setProfile((prev) => ({ ...prev, profileImageUrl: imageUrl }));
-
-    const userDocRef = doc(db, 'users', user.uid);
-    const payload = {
-      profileImageUrl: imageUrl,
-      updatedAt: new Date().toISOString(),
-    };
-
-    await setDoc(userDocRef, payload, { merge: true });
+    try {
+      await updateUserProfile({ profileImageUrl: imageUrl });
+    } catch (err) {
+      console.error('Error updating profile photo:', err);
+    }
   };
 
-  // Handler to save updated address array (Optimistic UI update)
+  // Handler to save updated address array
   const handleSaveAddresses = async (newAddresses) => {
     if (!user || !user.uid) return { success: false, message: 'Not authenticated' };
 
@@ -186,26 +98,13 @@ export function ProfilePage() {
     setProfile((prev) => ({ ...prev, addresses: newAddresses }));
 
     try {
-      const userDocRef = doc(db, 'users', user.uid);
-      const payload = {
-        addresses: newAddresses,
-        updatedAt: new Date().toISOString(),
-      };
-
-      await setDoc(userDocRef, payload, { merge: true });
-
-      try {
-        await fetchApi('/auth/profile', {
-          method: 'PUT',
-          body: JSON.stringify({
-            addresses: newAddresses,
-          }),
-        });
-      } catch (mongoErr) {
-        console.warn('MongoDB address save warning:', mongoErr.message);
+      const res = await updateUserProfile({ addresses: newAddresses });
+      if (res?.success) {
+        setProfile((prev) => ({ ...prev, addresses: newAddresses }));
+      } else {
+        setProfile((prev) => ({ ...prev, addresses: previousAddresses }));
       }
-
-      return { success: true };
+      return res;
     } catch (err) {
       console.error('Error saving address book:', err);
       setProfile((prev) => ({ ...prev, addresses: previousAddresses }));
@@ -213,8 +112,8 @@ export function ProfilePage() {
     }
   };
 
-  // Render Skeleton / Loading state
-  if (loading) {
+  // Render Skeleton / Loading state until MongoDB profile is hydrated
+  if ((profileLoading && !user?.profileLoaded) || !profile) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 animate-pulse">
         <div className="bg-white p-8 rounded-3xl border border-wagh-border flex items-center gap-6">
@@ -235,8 +134,8 @@ export function ProfilePage() {
     );
   }
 
-  // Render Error state
-  if (fetchError) {
+  // Render Error state only when profile never loaded from database
+  if (profileError && !user?.profileLoaded) {
     return (
       <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-6">
         <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
@@ -244,10 +143,10 @@ export function ProfilePage() {
         </div>
         <div className="space-y-2">
           <h2 className="font-editorial text-2xl font-bold text-wagh-dark">Unable to Access Private Workspace</h2>
-          <p className="text-sm text-wagh-muted">{fetchError}</p>
+          <p className="text-sm text-wagh-muted">{profileError}</p>
         </div>
         <button
-          onClick={loadUserProfile}
+          onClick={() => refreshProfile().then(() => window.location.reload())}
           className="px-6 py-3 rounded-full bg-wagh-teal text-white text-xs font-bold hover:bg-wagh-teal-dark transition-all inline-flex items-center gap-2 shadow-md"
         >
           <RefreshCw className="w-4 h-4" />
@@ -269,49 +168,49 @@ export function ProfilePage() {
       {/* Main Content Tabs & Actions */}
       <div className="bg-white rounded-3xl border border-wagh-border shadow-soft overflow-hidden">
         {/* Tab Navigation */}
-        <div className="flex flex-wrap border-b border-wagh-border bg-gray-50/80 px-4 sm:px-6 justify-between items-center">
-          <div className="flex">
+        <div className="flex flex-col sm:flex-row border-b border-wagh-border bg-gray-50/80 px-3 sm:px-6 justify-between items-stretch sm:items-center gap-2">
+          <div className="flex items-center overflow-x-auto custom-scrollbar flex-1 whitespace-nowrap -mb-[1px]">
             <button
               onClick={() => setActiveTab('profile')}
-              className={`py-4 px-5 font-mono-tag text-xs font-bold uppercase transition-all border-b-2 flex items-center gap-2 ${
+              className={`py-3 sm:py-4 px-3 sm:px-5 font-mono-tag text-[11px] sm:text-xs font-bold uppercase transition-all border-b-2 flex items-center gap-1.5 shrink-0 ${
                 activeTab === 'profile'
                   ? 'border-wagh-teal text-wagh-teal bg-white shadow-xs'
                   : 'border-transparent text-wagh-muted hover:text-wagh-dark'
               }`}
             >
-              <UserIcon className="w-4 h-4" />
+              <UserIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span>Profile & Addresses</span>
             </button>
 
             <button
               onClick={() => setActiveTab('orders')}
-              className={`py-4 px-5 font-mono-tag text-xs font-bold uppercase transition-all border-b-2 flex items-center gap-2 ${
+              className={`py-3 sm:py-4 px-3 sm:px-5 font-mono-tag text-[11px] sm:text-xs font-bold uppercase transition-all border-b-2 flex items-center gap-1.5 shrink-0 ${
                 activeTab === 'orders'
                   ? 'border-wagh-teal text-wagh-teal bg-white shadow-xs'
                   : 'border-transparent text-wagh-muted hover:text-wagh-dark'
               }`}
             >
-              <Package className="w-4 h-4" />
+              <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span>Orders ({orders.length})</span>
             </button>
 
             <button
               onClick={() => setActiveTab('wishlist')}
-              className={`py-4 px-5 font-mono-tag text-xs font-bold uppercase transition-all border-b-2 flex items-center gap-2 ${
+              className={`py-3 sm:py-4 px-3 sm:px-5 font-mono-tag text-[11px] sm:text-xs font-bold uppercase transition-all border-b-2 flex items-center gap-1.5 shrink-0 ${
                 activeTab === 'wishlist'
                   ? 'border-wagh-teal text-wagh-teal bg-white shadow-xs'
                   : 'border-transparent text-wagh-muted hover:text-wagh-dark'
               }`}
             >
-              <Heart className="w-4 h-4" />
+              <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span>Wishlist ({wishlist.length})</span>
             </button>
           </div>
 
-          <div className="py-2 flex items-center gap-3">
+          <div className="py-2 flex items-center justify-end shrink-0">
             <button
               onClick={logout}
-              className="px-3.5 py-1.5 rounded-full bg-red-50 text-wagh-error font-mono-tag text-xs font-bold hover:bg-red-100 flex items-center gap-1.5 transition-colors"
+              className="px-3 py-1.5 rounded-full bg-red-50 text-wagh-error font-mono-tag text-xs font-bold hover:bg-red-100 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Sign Out</span>
@@ -338,7 +237,7 @@ export function ProfilePage() {
               <div className="p-4 rounded-2xl bg-wagh-teal/5 border border-wagh-teal/20 text-xs text-wagh-dark flex items-center gap-3">
                 <ShieldCheck className="w-5 h-5 text-wagh-teal shrink-0" />
                 <span>
-                  <strong>Data Privacy Guaranteed:</strong> Your profile data and address book are strictly protected by Firebase Security Rules (`request.auth.uid == userId`). No third party or unauthorized visitor can view or modify your data.
+                  <strong>Data Privacy Guaranteed:</strong> Your profile data and address book are strictly protected by encrypted authentication & secure MongoDB database access. No unauthorized party or visitor can view or modify your data.
                 </span>
               </div>
             </div>

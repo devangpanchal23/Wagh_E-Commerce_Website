@@ -1,10 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { X, Zap, ShoppingBag, User, ShieldAlert, Phone, Info } from 'lucide-react';
+import { X, Zap, ShoppingBag, User, ShieldAlert, Phone, Info, Heart } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useWishlist } from '../context/WishlistContext';
 
 export function MobileDrawer({ isOpen, onClose }) {
   const { user, isAdmin, logout } = useAuth();
+  const { wishlist } = useWishlist();
 
   if (!isOpen) return null;
 
@@ -54,6 +56,21 @@ export function MobileDrawer({ isOpen, onClose }) {
               className="block py-2.5 px-4 rounded-xl text-base font-semibold text-wagh-dark hover:bg-wagh-teal/10 hover:text-wagh-teal transition-colors"
             >
               Shop All Accessories
+            </Link>
+            <Link
+              to={user ? "/profile" : "/profile"}
+              onClick={onClose}
+              className="flex items-center justify-between py-2.5 px-4 rounded-xl text-base font-semibold text-wagh-dark hover:bg-wagh-teal/10 hover:text-wagh-teal transition-colors"
+            >
+              <div className="flex items-center gap-2.5">
+                <Heart className="w-5 h-5 text-wagh-teal" />
+                <span>Favorites / Saved</span>
+              </div>
+              {wishlist.length > 0 && (
+                <span className="bg-wagh-gold text-wagh-dark text-xs font-bold font-mono-tag px-2 py-0.5 rounded-full">
+                  {wishlist.length}
+                </span>
+              )}
             </Link>
             <Link
               to="/about"

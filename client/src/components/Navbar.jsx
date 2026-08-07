@@ -93,12 +93,13 @@ export function Navbar({ onOpenSearch, onOpenMobileDrawer, onOpenAuthModal }) {
             <Search className="w-5 h-5" />
           </button>
 
-          {/* Wishlist */}
+          {/* Wishlist / Favorites */}
           <Link
             to={user ? "/profile" : "#"}
             onClick={handleProfileClick}
-            className="hidden sm:flex p-2.5 rounded-full text-wagh-dark/80 hover:text-wagh-teal hover:bg-wagh-teal/10 transition-colors relative"
+            className="flex p-2.5 rounded-full text-wagh-dark/80 hover:text-wagh-teal hover:bg-wagh-teal/10 transition-colors relative"
             title="Saved items"
+            aria-label="Favorites"
           >
             <Heart className="w-5 h-5" />
             {wishlist.length > 0 && (

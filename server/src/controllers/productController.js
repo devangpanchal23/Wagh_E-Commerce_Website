@@ -63,6 +63,12 @@ exports.getProducts = async (req, res, next) => {
       .skip(skip)
       .limit(limit);
 
+    // Calculate maximum product price dynamically for the selected category/search
+    const maxPriceQuery = { ...query };
+    delete maxPriceQuery.price;
+    const highestProduct = await Product.findOne(maxPriceQuery).sort({ price: -1 }).select('price').lean();
+    const maxProductPrice = highestProduct ? Math.ceil(highestProduct.price) : 2000;
+
     res.json({
       success: true,
       data: {
@@ -70,6 +76,7 @@ exports.getProducts = async (req, res, next) => {
         page,
         pages: Math.ceil(total / limit),
         total,
+        maxProductPrice,
       },
       message: 'Products fetched successfully'
     });

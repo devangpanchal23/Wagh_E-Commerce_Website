@@ -1,6 +1,3 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
-
 /**
  * Normalizes a product identifier from item object or string
  */
@@ -16,22 +13,22 @@ function getProductId(item) {
 }
 
 /**
- * Merges guest cart items with remote user cart items in Firestore.
+ * Merges guest cart items with user cart items.
  * Ensures no duplicate items and aggregates quantities.
  */
 export function mergeCartArrays(guestItems = [], userItems = []) {
   const mergedMap = new Map();
 
-  // Helper to add item to map
   const processItem = (item) => {
     const pId = getProductId(item);
     if (!pId) return;
 
     if (mergedMap.has(pId)) {
       const existing = mergedMap.get(pId);
+      // Use Math.max so duplicate initialization or refreshes never double or multiply quantity!
       mergedMap.set(pId, {
         ...existing,
-        qty: (existing.qty || 1) + (item.qty || 1),
+        qty: Math.max(existing.qty || 1, item.qty || 1),
       });
     } else {
       mergedMap.set(pId, {
@@ -42,7 +39,6 @@ export function mergeCartArrays(guestItems = [], userItems = []) {
     }
   };
 
-  // Add remote items first, then overlay guest items
   userItems.forEach(processItem);
   guestItems.forEach(processItem);
 
@@ -50,53 +46,75 @@ export function mergeCartArrays(guestItems = [], userItems = []) {
 }
 
 /**
- * Fetches user's cart from Firestore
+ * Saves current cart to local storage for authenticated user or guest
  */
-export async function getUserCartFromFirestore(uid) {
+export async function saveUserCartToFirestore(uid, cartItems) {
   try {
-    const userRef = doc(db, 'users', uid);
-    const snap = await getDoc(userRef);
-    if (snap.exists() && snap.data().cart) {
-      return snap.data().cart;
+    if (uid) {
+      localStorage.setItem(`wagh_cart_${uid}`, JSON.stringify(cartItems));
+      // Remove legacy shared key to prevent cross-user pollution
+      localStorage.removeItem('wagh_cart');
+    } else {
+      localStorage.setItem('wagh_guest_cart', JSON.stringify(cartItems));
     }
   } catch (error) {
-    console.error('Error fetching cart from Firestore:', error);
+    console.error('Error saving cart to local storage:', error);
   }
-  return [];
 }
 
 /**
- * Saves current cart to Firestore for authenticated user
+ * Fetches user's cart from local storage strictly bound to uid
  */
-export async function saveUserCartToFirestore(uid, cartItems) {
-  if (!uid) return;
+export async function getUserCartFromFirestore(uid) {
   try {
-    const userRef = doc(db, 'users', uid);
-    await setDoc(userRef, { cart: cartItems, updatedAt: new Date().toISOString() }, { merge: true });
+    if (uid) {
+      const saved = localStorage.getItem(`wagh_cart_${uid}`);
+      return saved ? JSON.parse(saved) : [];
+    } else {
+      const guestSaved = localStorage.getItem('wagh_guest_cart');
+      return guestSaved ? JSON.parse(guestSaved) : [];
+    }
   } catch (error) {
-    console.error('Error saving cart to Firestore:', error);
+    return [];
   }
 }
 
 /**
  * Main sync function called when user completes authentication.
- * Merges guest cart (localStorage) with user's Firestore cart,
- * writes back to Firestore and localStorage, and returns the merged cart.
+ * Merges guest cart items added during session into user's account cart.
  */
-export async function syncCartOnLogin(user, guestCartItems = []) {
-  if (!user || !user.uid) return guestCartItems;
+export async function syncCartOnLogin(user) {
+  if (!user || !user.uid) return [];
 
   try {
-    const remoteCart = await getUserCartFromFirestore(user.uid);
-    const mergedCart = mergeCartArrays(guestCartItems, remoteCart);
+    const userKey = `wagh_cart_${user.uid}`;
+    const userSaved = localStorage.getItem(userKey);
+    const userCart = userSaved ? JSON.parse(userSaved) : [];
 
-    // Save merged cart to Firestore and localStorage
-    await saveUserCartToFirestore(user.uid, mergedCart);
-    localStorage.setItem('wagh_cart', JSON.stringify(mergedCart));
+    // Check if there is a pending guest cart from pre-login browsing
+    const guestSaved = localStorage.getItem('wagh_guest_cart');
+    if (guestSaved) {
+      try {
+        const guestCart = JSON.parse(guestSaved);
+        if (Array.isArray(guestCart) && guestCart.length > 0) {
+          const mergedCart = mergeCartArrays(guestCart, userCart);
+          localStorage.setItem(userKey, JSON.stringify(mergedCart));
+          localStorage.removeItem('wagh_guest_cart');
+          localStorage.removeItem('wagh_cart');
+          return mergedCart;
+        }
+      } catch (e) {
+        console.error('Error parsing guest cart:', e);
+      }
+    }
 
-    return mergedCart;
+    // No pending guest cart -> Purge temp keys and return saved user cart as-is (NEVER duplicate or multiply)
+    localStorage.removeItem('wagh_guest_cart');
+    localStorage.removeItem('wagh_cart');
+    return userCart;
   } catch (error) {
     console.error('Error syncing cart on login:', error);
-    return guestCartItems;
+    return [];
   }
 }
+

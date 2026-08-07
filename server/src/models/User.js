@@ -23,7 +23,6 @@ const userSchema = new mongoose.Schema({
   clerkId: {
     type: String,
     default: '',
-    index: true,
   },
   role: {
     type: String,
@@ -37,8 +36,7 @@ const userSchema = new mongoose.Schema({
   },
   age: {
     type: Number,
-    min: [13, 'Age must be at least 13'],
-    max: [100, 'Age must not exceed 100'],
+    default: null,
   },
   gender: {
     type: String,
@@ -51,6 +49,10 @@ const userSchema = new mongoose.Schema({
     default: '',
   },
   addresses: [{
+    id: String,
+    label: String,
+    line1: String,
+    line2: String,
     street: String,
     city: String,
     state: String,
@@ -61,6 +63,9 @@ const userSchema = new mongoose.Schema({
 }, {
   timestamps: true,
 });
+
+userSchema.index({ clerkId: 1 }, { sparse: true });
+userSchema.index({ email: 1 });
 
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();

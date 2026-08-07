@@ -15,18 +15,18 @@ export function ProductCard({ product }) {
     : 0;
 
   return (
-    <div className="group bg-white rounded-xl border border-wagh-border p-4 flex flex-col justify-between transition-all duration-300 hover:shadow-soft-hover hover:-translate-y-1.5 relative overflow-hidden">
+    <div className="group bg-white rounded-xl border border-wagh-border p-4 flex flex-col justify-between transition-all duration-300 hover:shadow-soft-hover hover:-translate-y-1.5 relative overflow-hidden w-full max-w-full">
       
       {/* Badges & Wishlist Trigger */}
       <div className="flex items-center justify-between z-10">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {product.isBestSeller && (
-            <span className="px-2 py-0.5 rounded-full bg-wagh-teal text-white text-[10px] font-mono-tag font-bold tracking-wider uppercase shadow-sm">
+            <span className="px-2 py-0.5 rounded-full bg-wagh-teal text-white text-[10px] font-mono-tag font-bold tracking-wider uppercase shadow-xs">
               Best Seller
             </span>
           )}
           {product.isNewArrival && (
-            <span className="px-2 py-0.5 rounded-full bg-wagh-gold text-wagh-dark text-[10px] font-mono-tag font-bold tracking-wider uppercase shadow-sm">
+            <span className="px-2 py-0.5 rounded-full bg-wagh-gold text-wagh-dark text-[10px] font-mono-tag font-bold tracking-wider uppercase shadow-xs">
               New
             </span>
           )}
@@ -39,7 +39,7 @@ export function ProductCard({ product }) {
 
         <button
           onClick={() => toggleWishlist(product)}
-          className={`p-2 rounded-full transition-colors ${
+          className={`p-2 rounded-full transition-colors shrink-0 ${
             isLiked
               ? 'bg-red-50 text-wagh-error'
               : 'bg-gray-100/80 text-gray-500 hover:text-wagh-error hover:bg-red-50'
@@ -61,13 +61,13 @@ export function ProductCard({ product }) {
       </Link>
 
       {/* Details */}
-      <div className="space-y-2 flex-1 flex flex-col justify-between">
-        <div>
-          <div className="text-[11px] font-mono-tag uppercase tracking-wider text-wagh-muted font-semibold">
+      <div className="space-y-2 flex-1 flex flex-col justify-between min-w-0 w-full">
+        <div className="min-w-0 w-full">
+          <div className="text-[11px] font-mono-tag uppercase tracking-wider text-wagh-muted font-semibold truncate">
             {product.brand || 'WAGH'}
           </div>
-          <Link to={`/product/${product._id}`}>
-            <h3 className="font-editorial text-base font-bold text-wagh-dark group-hover:text-wagh-teal transition-colors line-clamp-2 leading-snug">
+          <Link to={`/product/${product._id}`} className="block min-w-0 w-full">
+            <h3 className="font-editorial text-sm sm:text-base font-bold text-wagh-dark group-hover:text-wagh-teal transition-colors line-clamp-2 leading-snug break-words max-w-full overflow-hidden">
               {product.name}
             </h3>
           </Link>

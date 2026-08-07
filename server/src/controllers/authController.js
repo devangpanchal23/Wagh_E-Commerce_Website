@@ -1,6 +1,15 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
+const normalizeBirthdate = (value) => {
+  if (!value) return '';
+  const str = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  const parsed = new Date(str);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toISOString().slice(0, 10);
+};
+
 const generateToken = (id, role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET || 'wagh_super_secret_jwt_key_2026_premium_accessories', {
     expiresIn: process.env.JWT_EXPIRE || '30d',
@@ -79,19 +88,40 @@ exports.loginUser = async (req, res, next) => {
 // @route   GET /api/v1/auth/profile
 exports.getUserProfile = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = req.user;
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+
+    // Dynamic age calculation from birthdate if provided
+    let computedAge = user.age;
+    if (user.birthdate) {
+      const dob = new Date(user.birthdate);
+      if (!isNaN(dob.getTime())) {
+        const today = new Date();
+        let calc = today.getFullYear() - dob.getFullYear();
+        const m = today.getMonth() - dob.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+          calc--;
+        }
+        computedAge = calc >= 0 ? calc : 0;
+        if (user.age !== computedAge) {
+          User.updateOne({ _id: user._id }, { age: computedAge }).catch(() => {});
+        }
+      }
+    }
+
     res.json({
       success: true,
       data: {
         _id: user._id,
+        clerkId: user.clerkId || '',
         name: user.name,
         email: user.email,
         mobileNumber: user.mobileNumber || '',
-        birthdate: user.birthdate || '',
-        age: user.age || null,
+        phone: user.mobileNumber || '',
+        birthdate: normalizeBirthdate(user.birthdate),
+        age: computedAge !== undefined && computedAge !== null ? computedAge : null,
         gender: user.gender || 'prefer_not_to_say',
         role: user.role,
         addresses: user.addresses || [],
@@ -107,48 +137,74 @@ exports.getUserProfile = async (req, res, next) => {
 // @route   PUT /api/v1/auth/profile
 exports.updateUserProfile = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id);
-    if (!user) {
+    const userId = req.user._id;
+    const existingUser = await User.findById(userId).lean();
+    if (!existingUser) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const { name, email, mobileNumber, age, gender, birthdate, password, addresses } = req.body;
+    const { name, email, mobileNumber, phone, age, gender, birthdate, password, addresses } = req.body;
     const errors = {};
 
+    const targetPhone = mobileNumber !== undefined ? mobileNumber : phone;
+
     // Validate name if provided
-    if (name !== undefined && name !== null) {
-      if (!name.trim()) {
-        errors.name = 'Name cannot be empty';
-      }
+    if (name !== undefined && name !== null && !name.trim()) {
+      errors.name = 'Name cannot be empty';
     }
 
     // Validate email if changed
-    if (email !== undefined && email.trim().toLowerCase() !== user.email) {
-      const emailRegex = /^\S+@\S+\.\S+$/;
-      if (!emailRegex.test(email.trim())) {
-        errors.email = 'Please provide a valid email address';
-      } else {
-        const emailExists = await User.findOne({ email: email.trim().toLowerCase(), _id: { $ne: user._id } });
-        if (emailExists) {
-          errors.email = 'Email address is already registered';
+    if (email !== undefined && email !== null && email.trim() !== '') {
+      const emailLower = email.trim().toLowerCase();
+      if (emailLower !== existingUser.email) {
+        const emailRegex = /^\S+@\S+\.\S+$/;
+        if (!emailRegex.test(emailLower)) {
+          errors.email = 'Please provide a valid email address';
+        } else {
+          const emailExists = await User.findOne({ email: emailLower, _id: { $ne: userId } });
+          if (emailExists) {
+            errors.email = 'Email address is already registered';
+          }
         }
       }
     }
 
-    // Validate mobileNumber if provided
-    if (mobileNumber !== undefined && mobileNumber !== null && mobileNumber.trim() !== '') {
-      const cleanMobile = mobileNumber.trim();
+    // Validate mobileNumber / phone if provided
+    if (targetPhone !== undefined && targetPhone !== null && targetPhone.trim() !== '') {
+      const cleanMobile = targetPhone.trim();
       const mobileRegex = /^\d{10}$/;
       if (!mobileRegex.test(cleanMobile)) {
         errors.mobileNumber = 'Mobile number must be a 10-digit phone number';
       }
     }
 
-    // Validate age if provided
-    if (age !== undefined && age !== null && age !== '') {
+    // Validate birthdate & compute age automatically
+    let computedAge = age;
+    if (birthdate !== undefined && birthdate !== null && birthdate !== '') {
+      const dob = new Date(birthdate);
+      const today = new Date();
+      if (isNaN(dob.getTime())) {
+        errors.birthdate = 'Please provide a valid birthdate';
+      } else if (dob > today) {
+        errors.birthdate = 'Birthdate cannot be in the future';
+      } else {
+        let calc = today.getFullYear() - dob.getFullYear();
+        const m = today.getMonth() - dob.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+          calc--;
+        }
+        if (calc < 13 || calc > 100) {
+          errors.birthdate = 'Age must be between 13 and 100 years';
+        } else {
+          computedAge = calc;
+        }
+      }
+    } else if (age !== undefined && age !== null && age !== '') {
       const parsedAge = Number(age);
       if (isNaN(parsedAge) || !Number.isInteger(parsedAge) || parsedAge < 13 || parsedAge > 100) {
         errors.age = 'Age must be an integer between 13 and 100';
+      } else {
+        computedAge = parsedAge;
       }
     }
 
@@ -168,34 +224,43 @@ exports.updateUserProfile = async (req, res, next) => {
       });
     }
 
-    // Apply updates
-    if (name !== undefined && name !== null) user.name = name.trim();
+    // Build atomic update payload
+    const updateFields = {};
+    if (name !== undefined && name !== null) updateFields.name = name.trim();
     let tokenRefreshed = null;
-    if (email !== undefined && email.trim().toLowerCase() !== user.email) {
-      user.email = email.trim().toLowerCase();
-      tokenRefreshed = generateToken(user._id, user.role);
+    if (email !== undefined && email !== null && email.trim() !== '') {
+      const emailLower = email.trim().toLowerCase();
+      if (emailLower !== existingUser.email) {
+        updateFields.email = emailLower;
+        tokenRefreshed = generateToken(userId, existingUser.role);
+      }
     }
-    if (mobileNumber !== undefined) user.mobileNumber = mobileNumber.trim();
-    if (age !== undefined) user.age = age === '' || age === null ? null : Number(age);
-    if (gender !== undefined) user.gender = gender;
-    if (birthdate !== undefined) user.birthdate = birthdate;
-    if (addresses !== undefined) user.addresses = addresses;
-    if (password) user.password = password;
+    if (targetPhone !== undefined) updateFields.mobileNumber = targetPhone.trim();
+    if (birthdate !== undefined) updateFields.birthdate = birthdate;
+    if (computedAge !== undefined) updateFields.age = computedAge === '' || computedAge === null ? null : Number(computedAge);
+    if (gender !== undefined) updateFields.gender = gender;
+    if (addresses !== undefined) updateFields.addresses = addresses;
 
-    const updatedUser = await user.save();
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateFields },
+      { new: true, runValidators: false }
+    ).select('_id clerkId name email mobileNumber birthdate age gender addresses role').lean();
 
     res.json({
       success: true,
       data: {
         _id: updatedUser._id,
+        clerkId: updatedUser.clerkId || '',
         name: updatedUser.name,
         email: updatedUser.email,
         mobileNumber: updatedUser.mobileNumber || '',
-        birthdate: updatedUser.birthdate || '',
-        age: updatedUser.age || null,
+        phone: updatedUser.mobileNumber || '',
+        birthdate: normalizeBirthdate(updatedUser.birthdate),
+        age: updatedUser.age !== undefined && updatedUser.age !== null ? updatedUser.age : null,
         gender: updatedUser.gender || 'prefer_not_to_say',
         role: updatedUser.role,
-        addresses: updatedUser.addresses,
+        addresses: updatedUser.addresses || [],
         ...(tokenRefreshed ? { token: tokenRefreshed } : {}),
       },
       message: 'Profile updated successfully'

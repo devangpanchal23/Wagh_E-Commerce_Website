@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Trash2, ShoppingBag, ArrowRight, ShieldCheck, Zap, Tag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { CheckoutButton } from '../components/CheckoutButton';
 
 export function Cart() {
-  const { cartItems, updateQty, removeFromCart, subtotal, shippingFee, grandTotal } = useCart();
+  const { cartItems, updateQty, removeFromCart, clearCart, subtotal, shippingFee, grandTotal } = useCart();
+  const { user } = useAuth();
   const [coupon, setCoupon] = useState('');
   const [discount, setDiscount] = useState(0);
   const [couponApplied, setCouponApplied] = useState(false);
@@ -49,13 +51,53 @@ export function Cart() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       
-      <div className="border-b border-wagh-border pb-4">
-        <h1 className="font-editorial text-3xl font-extrabold text-wagh-dark">
-          Shopping Cart ({cartItems.reduce((acc, i) => acc + i.qty, 0)} Items)
-        </h1>
+      <div className="border-b border-wagh-border pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="font-editorial text-3xl font-extrabold text-wagh-dark">
+            Shopping Cart ({cartItems.reduce((acc, i) => acc + i.qty, 0)} Items)
+          </h1>
+          <p className="text-xs text-wagh-muted font-mono-tag">Review and adjust your selected items</p>
+        </div>
+
+        <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
+          <button
+            onClick={() => {
+              clearCart();
+              addToast('Shopping cart cleared', 'info');
+            }}
+            className="px-3.5 py-1.5 rounded-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 font-mono-tag font-bold text-xs shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Clear all items from cart"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Clear All Items</span>
+          </button>
+
+          {!user && (
+            <span className="px-3.5 py-1.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-mono-tag font-bold text-xs shrink-0">
+              Guest Session
+            </span>
+          )}
+        </div>
       </div>
+
+      {!user && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-amber-900 shadow-2xs font-sans">
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0" />
+            <span>
+              <strong>Shopping as Guest:</strong> Sign in to sync your cart across devices and save delivery preferences.
+            </span>
+          </div>
+          <Link
+            to="/profile"
+            className="px-4 py-2 rounded-xl bg-amber-600 text-white font-extrabold text-xs whitespace-nowrap hover:bg-amber-700 transition-colors shrink-0 shadow-2xs cursor-pointer"
+          >
+            Sign In / Register
+          </Link>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
@@ -69,57 +111,83 @@ export function Cart() {
             return (
               <div
                 key={pId}
-                className="bg-white p-4 sm:p-6 rounded-2xl border border-wagh-border shadow-soft flex flex-col sm:flex-row items-center gap-4 sm:gap-6"
+                className="bg-white p-4 sm:p-5 rounded-2xl border border-wagh-border shadow-soft hover:shadow-soft-hover transition-all duration-300 space-y-3.5 w-full max-w-full overflow-hidden"
               >
-                {/* Thumbnail */}
-                <Link to={`/product/${pId}`} className="w-20 h-20 sm:w-24 sm:h-24 bg-gray-50 rounded-xl p-2 shrink-0 border border-wagh-border flex items-center justify-center">
-                  <img
-                    src={product.images && product.images.length > 0 ? product.images[0] : 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600'}
-                    alt={product.name}
-                    className="max-h-full max-w-full object-contain"
-                  />
-                </Link>
-
-                {/* Details */}
-                <div className="flex-1 min-w-0 text-center sm:text-left space-y-1">
-                  <span className="text-[10px] font-mono-tag uppercase text-wagh-muted font-bold">
-                    {product.brand || 'WAGH'}
-                  </span>
-                  <Link to={`/product/${pId}`}>
-                    <h3 className="font-bold text-wagh-dark text-base hover:text-wagh-teal transition-colors truncate">
-                      {product.name}
-                    </h3>
+                {/* ROW 1: Product Thumbnail (Left) + Brand & Full Title (Right) */}
+                <div className="flex items-start gap-3.5 sm:gap-4 w-full min-w-0">
+                  <Link
+                    to={`/product/${pId}`}
+                    className="w-20 h-20 sm:w-24 sm:h-24 bg-gray-50 rounded-2xl p-1.5 shrink-0 border border-wagh-border flex items-center justify-center shadow-2xs overflow-hidden group"
+                  >
+                    <img
+                      src={product.images && product.images.length > 0 ? product.images[0] : 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600'}
+                      alt={product.name}
+                      className="w-full h-full object-contain p-1 transform group-hover:scale-105 transition-transform duration-300"
+                    />
                   </Link>
-                  <div className="font-mono-tag text-sm font-bold text-wagh-teal">
-                    ₹{price}
+
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-mono-tag uppercase tracking-wider text-wagh-muted font-bold truncate">
+                        {product.brand || 'WAGH'}
+                      </span>
+                      <span className="font-mono-tag text-xs text-wagh-muted shrink-0">
+                        ₹{price} / unit
+                      </span>
+                    </div>
+
+                    <Link to={`/product/${pId}`} className="block">
+                      <h3 className="font-bold text-wagh-dark text-sm sm:text-base hover:text-wagh-teal transition-colors line-clamp-2 leading-snug break-words">
+                        {product.name}
+                      </h3>
+                    </Link>
+
+                    <p className="text-xs text-wagh-muted line-clamp-1 leading-relaxed font-sans pt-0.5">
+                      {product.description || product.specs?.outputPower || 'High quality WAGH mobile accessory with fast charging capability.'}
+                    </p>
                   </div>
                 </div>
 
-                {/* Stepper */}
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center border border-wagh-border rounded-xl bg-white">
+                {/* ROW 2: Bottom Actions Bar (Quantity Stepper, Remove Button, Item Total Price) */}
+                <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono-tag text-wagh-muted font-semibold hidden xs:inline">Qty:</span>
+                    <div className="flex items-center gap-1.5 bg-gray-50 border border-wagh-border p-1 rounded-xl">
+                      <button
+                        onClick={() => updateQty(pId, item.qty - 1)}
+                        className="w-7 h-7 rounded-lg bg-red-500 hover:bg-red-600 text-white font-extrabold text-sm flex items-center justify-center transition-colors shadow-2xs cursor-pointer active:scale-95"
+                        title="Decrease quantity"
+                      >
+                        -
+                      </button>
+                      <span className="w-7 text-center font-mono-tag font-extrabold text-xs sm:text-sm text-wagh-dark">
+                        {item.qty}
+                      </span>
+                      <button
+                        onClick={() => updateQty(pId, item.qty + 1)}
+                        className="w-7 h-7 rounded-lg bg-red-500 hover:bg-red-600 text-white font-extrabold text-sm flex items-center justify-center transition-colors shadow-2xs cursor-pointer active:scale-95"
+                        title="Increase quantity"
+                      >
+                        +
+                      </button>
+                    </div>
+
                     <button
-                      onClick={() => updateQty(pId, item.qty - 1)}
-                      className="px-3 py-1 font-bold text-wagh-dark hover:bg-gray-100 rounded-l-xl"
+                      onClick={() => removeFromCart(pId)}
+                      className="p-1.5 sm:px-3 sm:py-1.5 rounded-xl text-red-500 hover:bg-red-50 transition-colors cursor-pointer flex items-center gap-1 text-xs font-mono-tag font-semibold"
+                      title="Remove item"
                     >
-                      -
-                    </button>
-                    <span className="px-3 font-mono-tag font-bold text-sm">{item.qty}</span>
-                    <button
-                      onClick={() => updateQty(pId, item.qty + 1)}
-                      className="px-3 py-1 font-bold text-wagh-dark hover:bg-gray-100 rounded-r-xl"
-                    >
-                      +
+                      <Trash2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Remove</span>
                     </button>
                   </div>
 
-                  <button
-                    onClick={() => removeFromCart(pId)}
-                    className="p-2 text-wagh-muted hover:text-wagh-error transition-colors"
-                    title="Remove item"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                  <div className="text-right shrink-0 font-mono-tag">
+                    <span className="text-[10px] text-wagh-muted block uppercase font-bold">Total</span>
+                    <span className="text-base sm:text-lg font-extrabold text-wagh-teal">
+                      ₹{price * item.qty}
+                    </span>
+                  </div>
                 </div>
               </div>
             );

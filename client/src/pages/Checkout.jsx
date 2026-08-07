@@ -192,61 +192,90 @@ export function Checkout() {
   };
 
   // ORDER CONFIRMATION SCREEN
+  // ORDER CONFIRMATION / DETAIL TRANSACTION SCREEN (Matches Reference Mockup)
   if (completedOrder) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-16 text-center space-y-6">
-        <div className="w-20 h-20 bg-wagh-success/10 text-wagh-success rounded-full flex items-center justify-center mx-auto">
-          <CheckCircle2 className="w-12 h-12" />
-        </div>
-
-        <span className="font-mono-tag text-xs font-bold uppercase tracking-widest text-wagh-teal bg-wagh-teal/10 px-4 py-1.5 rounded-full border border-wagh-teal/20">
-          Order Confirmed
-        </span>
-
-        <h1 className="font-editorial text-4xl font-extrabold text-wagh-dark">
-          Thank You For Your Order!
-        </h1>
-
-        <div className="bg-white p-6 rounded-2xl border border-wagh-border shadow-soft text-left space-y-4 font-mono-tag text-sm">
-          <div className="flex justify-between border-b border-wagh-border pb-3">
-            <span className="text-wagh-muted">Order ID:</span>
-            <span className="font-bold text-wagh-teal">{completedOrder.orderId}</span>
-          </div>
-
-          <div className="flex justify-between border-b border-wagh-border pb-3">
-            <span className="text-wagh-muted">Total Amount:</span>
-            <span className="font-bold text-wagh-dark">₹{completedOrder.total}</span>
-          </div>
-
-          <div className="flex justify-between border-b border-wagh-border pb-3">
-            <span className="text-wagh-muted">Payment Mode:</span>
-            <span className="font-bold text-wagh-dark">{completedOrder.paymentMethod} ({completedOrder.paymentStatus})</span>
-          </div>
-
-          <div className="space-y-1 pt-1">
-            <span className="text-wagh-muted text-xs block">SHIPPING ADDRESS</span>
-            <p className="font-sans font-medium text-wagh-dark">
-              {completedOrder.shippingAddress.name} ({completedOrder.shippingAddress.phone})
-              <br />
-              {completedOrder.shippingAddress.street}, {completedOrder.shippingAddress.city}, {completedOrder.shippingAddress.state} - {completedOrder.shippingAddress.pincode}
-            </p>
+      <div className="max-w-xl mx-auto px-4 py-12 text-center space-y-6">
+        {/* Floating Green Success Badge as seen in reference image */}
+        <div className="relative inline-block mx-auto">
+          <div className="w-24 h-24 bg-emerald-100/70 rounded-full flex items-center justify-center p-2 mx-auto animate-bounce">
+            <div className="w-18 h-18 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg">
+              <CheckCircle2 className="w-10 h-10 stroke-[2.5]" />
+            </div>
           </div>
         </div>
 
-        <p className="text-xs text-wagh-muted font-sans">
-          A confirmation SMS and email have been dispatched. Estimated delivery within 48 hours.
-        </p>
+        <div>
+          <h1 className="font-editorial text-3xl sm:text-4xl font-extrabold text-wagh-dark">
+            Payment Successful!
+          </h1>
+          <p className="text-xs sm:text-sm text-wagh-muted font-sans mt-1.5">
+            Successfully authorized order <span className="font-bold text-wagh-teal font-mono-tag">₹{completedOrder.total}</span> to WAGH Store
+          </p>
+        </div>
 
-        <div className="pt-4 flex justify-center gap-4">
+        {/* Detail Transaction Card (Matches Reference Image) */}
+        <div className="bg-white p-6 rounded-3xl border border-wagh-border shadow-soft text-left space-y-4 font-mono-tag text-xs sm:text-sm">
+          <h3 className="font-editorial text-lg font-bold text-wagh-dark border-b border-wagh-border/80 pb-3">
+            Detail Transaction
+          </h3>
+
+          <div className="flex justify-between items-center text-wagh-muted">
+            <span>Transaction ID</span>
+            <span className="font-bold text-wagh-dark">{completedOrder.orderId}</span>
+          </div>
+
+          <div className="flex justify-between items-center text-wagh-muted">
+            <span>Date</span>
+            <span className="font-bold text-wagh-dark">
+              {new Date(completedOrder.createdAt || Date.now()).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </span>
+          </div>
+
+          <div className="flex justify-between items-center text-wagh-muted">
+            <span>Type of Transaction</span>
+            <span className="font-bold text-wagh-dark">{completedOrder.paymentMethod || 'Online Transfer'}</span>
+          </div>
+
+          <div className="flex justify-between items-center text-wagh-muted">
+            <span>Nominal</span>
+            <span className="font-bold text-wagh-dark">₹{completedOrder.subtotal || completedOrder.total}</span>
+          </div>
+
+          <div className="flex justify-between items-center text-wagh-muted">
+            <span>Shipping Fee</span>
+            <span className="font-bold text-wagh-dark">{completedOrder.shippingFee === 0 ? 'FREE' : `₹${completedOrder.shippingFee}`}</span>
+          </div>
+
+          <div className="flex justify-between items-center text-wagh-muted">
+            <span>Recipient Number</span>
+            <span className="font-bold text-wagh-dark">{completedOrder.shippingAddress?.phone || '+91 90544 05305'}</span>
+          </div>
+
+          <div className="flex justify-between items-center text-wagh-muted">
+            <span>Status</span>
+            <span className="font-extrabold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+              {completedOrder.paymentStatus || 'Success'}
+            </span>
+          </div>
+
+          <div className="flex justify-between items-center text-base font-extrabold text-wagh-dark border-t border-wagh-border pt-3">
+            <span>Total</span>
+            <span className="text-wagh-teal">₹{completedOrder.total}</span>
+          </div>
+        </div>
+
+        {/* Full width primary action button */}
+        <div className="space-y-3 pt-2">
           <Link
             to="/profile"
-            className="px-6 py-3 rounded-full bg-wagh-teal text-white font-bold text-sm shadow-md"
+            className="w-full py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-sm shadow-md transition-all block text-center"
           >
-            Track in My Account
+            Close & Track Order
           </Link>
           <Link
             to="/shop"
-            className="px-6 py-3 rounded-full bg-white text-wagh-dark border border-wagh-border font-bold text-sm"
+            className="w-full py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 text-wagh-dark font-bold text-xs transition-all block text-center"
           >
             Continue Shopping
           </Link>
@@ -407,17 +436,17 @@ export function Checkout() {
 
           <div className="max-h-60 overflow-y-auto space-y-3 pr-2">
             {cartItems.map((item) => (
-              <div key={item.product._id || item.product} className="flex items-center gap-3 text-xs">
+              <div key={item.product._id || item.product} className="flex items-center gap-3.5 text-xs py-1">
                 <img
                   src={item.product.images?.[0] || 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600'}
                   alt={item.product.name}
-                  className="w-12 h-12 object-contain rounded bg-gray-50 border p-1"
+                  className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-xl bg-gray-50 border border-wagh-border p-1.5 shrink-0 shadow-2xs"
                 />
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-bold text-wagh-dark truncate">{item.product.name}</h4>
-                  <p className="text-wagh-muted">Qty: {item.qty}</p>
+                  <h4 className="font-bold text-wagh-dark text-sm truncate">{item.product.name}</h4>
+                  <p className="text-wagh-muted font-mono-tag mt-0.5">Qty: {item.qty} × ₹{item.product.price || item.price}</p>
                 </div>
-                <span className="font-mono-tag font-bold text-wagh-teal">₹{(item.product.price || item.price) * item.qty}</span>
+                <span className="font-mono-tag font-extrabold text-wagh-teal text-sm shrink-0">₹{(item.product.price || item.price) * item.qty}</span>
               </div>
             ))}
           </div>
