@@ -109,6 +109,10 @@ const seedDatabase = async () => {
           outputPower: '45W Max PPS / PD 3.0',
           compatibility: 'Universal (Samsung SFC 2.0, iPhone 15/14, iPad, Mac, Pixel)',
           cableLength: '1.2m Braided Type-C Included',
+          dimensions: '5.2 × 4.8 × 2.8 cm',
+          size: 'Height: 5.2 cm | Width: 4.8 cm',
+          height: '5.2 cm',
+          width: '4.8 cm',
           warranty: '24 Months Replacement Warranty',
           color: 'Premium Deep Teal & Matte Gold',
           material: 'Fireproof PC + Anodized Aluminum Rim'
@@ -137,6 +141,10 @@ const seedDatabase = async () => {
         specs: {
           outputPower: '65W Total (USB-C 65W + USB-A 18W)',
           compatibility: 'MacBook Air/Pro, iPhone, Android, Steam Deck',
+          dimensions: '6.5 × 5.0 × 3.0 cm',
+          size: 'Height: 6.5 cm | Width: 5.0 cm',
+          height: '6.5 cm',
+          width: '5.0 cm',
           warranty: '24 Months Warranty',
           color: 'Stealth Black',
           material: 'Gallium Nitride III Semiconductor'
@@ -165,6 +173,10 @@ const seedDatabase = async () => {
         specs: {
           outputPower: '22.5W Fast Charge / 20W PD Type-C',
           compatibility: 'Universal USB-A & USB-C Devices',
+          dimensions: '14.8 × 6.8 × 2.6 cm',
+          size: 'Height: 14.8 cm | Width: 6.8 cm',
+          height: '14.8 cm',
+          width: '6.8 cm',
           warranty: '12 Months Warranty',
           color: 'Deep Teal Metal Finish',
           material: 'Textured Anti-scratch ABS Alloy'
@@ -193,6 +205,10 @@ const seedDatabase = async () => {
         specs: {
           outputPower: '15W MagSafe Wireless / 20W Type-C PD',
           compatibility: 'iPhone 12/13/14/15/16 Series & Qi Android',
+          dimensions: '10.2 × 6.5 × 1.8 cm',
+          size: 'Height: 10.2 cm | Width: 6.5 cm',
+          height: '10.2 cm',
+          width: '6.5 cm',
           warranty: '12 Months Warranty',
           color: 'Titanium Grey & Deep Teal',
           material: 'Soft-Touch Matte Silicone & Aluminum Stand'
@@ -222,6 +238,10 @@ const seedDatabase = async () => {
           outputPower: '100W 5A Max Power Delivery',
           cableLength: '1.5 Meters (5 Feet)',
           compatibility: 'Type-C Laptops, Tablets, Smartphones',
+          dimensions: '150 × 0.5 × 0.5 cm',
+          size: 'Length: 150 cm | Width: 0.5 cm',
+          height: '150 cm',
+          width: '0.5 cm',
           warranty: '24 Months Replacement Warranty',
           color: 'Deep Teal Braided Weave',
           material: 'Kevlar Reinforced Nylon Fiber'
@@ -251,6 +271,10 @@ const seedDatabase = async () => {
           outputPower: '27W Max iPhone PD Fast Charge',
           cableLength: '1.2 Meters',
           compatibility: 'iPhone 14/13/12/11, iPad, AirPods',
+          dimensions: '120 × 0.4 × 0.4 cm',
+          size: 'Length: 120 cm | Width: 0.4 cm',
+          height: '120 cm',
+          width: '0.4 cm',
           warranty: '24 Months Warranty',
           color: 'Off-White & Amber Gold Connectors',
           material: 'Braided Nylon + Zinc Alloy Shell'
@@ -280,6 +304,10 @@ const seedDatabase = async () => {
           outputPower: '32dB Hybrid ANC + ENC Quad Mic',
           compatibility: 'Bluetooth 5.3 Universal (iOS & Android)',
           batteryLife: '40 Hours Total with Charging Case',
+          dimensions: '6.0 × 4.8 × 2.4 cm',
+          size: 'Height: 6.0 cm | Width: 4.8 cm',
+          height: '6.0 cm',
+          width: '4.8 cm',
           warranty: '12 Months Replacement Warranty',
           color: 'Teal Green Glass Metallic Case',
           material: 'Ergonomic IPX5 Sweatproof Silicone'
@@ -309,6 +337,10 @@ const seedDatabase = async () => {
           outputPower: '13mm Titanium Drivers / ENC',
           batteryLife: '30 Hours Playback / ASAP Fast Charge',
           compatibility: 'Bluetooth v5.2 Dual Pairing',
+          dimensions: '18.0 × 14.0 × 1.2 cm',
+          size: 'Height: 18.0 cm | Width: 14.0 cm',
+          height: '18.0 cm',
+          width: '14.0 cm',
           warranty: '12 Months Warranty',
           color: 'Matte Teal & Midnight Black',
           material: 'Liquid Silicone Neckband'

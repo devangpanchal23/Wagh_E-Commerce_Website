@@ -17,8 +17,10 @@ const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
+const path = require('path');
+
 // Security headers
-app.use(helmet());
+app.use(helmet({ crossOriginResourcePolicy: false }));
 
 // CORS configuration
 const allowedOrigins = process.env.CLIENT_URL
@@ -33,6 +35,9 @@ app.use(cors({
 // Body parser
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Serve uploaded product images statically
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 // Rate limiting
 const limiter = rateLimit({

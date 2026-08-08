@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Search, X, Zap, ArrowRight } from 'lucide-react';
 import { fetchApi } from '../api';
+import { ProductImage } from './ProductImage';
 
 export function SearchOverlay({ isOpen, onClose }) {
   const [query, setQuery] = useState('');
@@ -103,10 +104,11 @@ export function SearchOverlay({ isOpen, onClose }) {
                   onClick={onClose}
                   className="flex items-center gap-3.5 p-3 rounded-2xl hover:bg-gray-50 cursor-pointer transition-all group border border-transparent hover:border-gray-100"
                 >
-                  <img
-                    src={product.images[0]}
+                  <ProductImage
+                    src={product.images}
                     alt={product.name}
-                    className="w-12 h-12 object-contain rounded-xl bg-gray-50 border border-gray-100 p-1 shrink-0"
+                    variant="thumbnail"
+                    className="w-12 h-12 shrink-0"
                   />
                   <div className="flex-1 min-w-0">
                     <h4 className="font-bold text-gray-900 text-sm group-hover:text-teal-600 transition-colors truncate">

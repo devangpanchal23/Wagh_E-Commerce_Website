@@ -17,6 +17,7 @@ export function Shop() {
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   // Filter States
+  const searchQueryParam = searchParams.get('search') || '';
   const selectedCategory = searchParams.get('category') || '';
   const selectedSort = searchParams.get('sort') || 'newest';
   const minPriceParam = searchParams.get('minPrice') || '';
@@ -53,6 +54,7 @@ export function Shop() {
           sort: selectedSort,
         });
 
+        if (searchQueryParam) queryParams.append('search', searchQueryParam);
         if (selectedCategory) queryParams.append('category', selectedCategory);
         if (minPriceParam) queryParams.append('minPrice', minPriceParam);
         if (maxPriceParam) queryParams.append('maxPrice', maxPriceParam);
@@ -60,15 +62,16 @@ export function Shop() {
 
         const res = await fetchApi(`/products?${queryParams.toString()}`);
         if (res.success && res.data) {
-          setProducts(res.data.products);
-          setTotalCount(res.data.total);
-          setTotalPages(res.data.pages);
+          setProducts(res.data.products || []);
+          setTotalCount(res.data.total || 0);
+          setTotalPages(res.data.pages || 1);
           if (res.data.maxProductPrice) {
             setMaxLimit(res.data.maxProductPrice);
           }
         }
       } catch (err) {
         console.error('Products load error', err);
+        setProducts([]);
       } finally {
         setLoading(false);
       }
@@ -88,11 +91,12 @@ export function Shop() {
     setSearchParams(updated);
   };
 
-  const handleCategoryToggle = (slug) => {
-    if (selectedCategory === slug) {
+  const handleCategoryToggle = (cat) => {
+    const matchSlugOrId = cat.slug || cat._id;
+    if (selectedCategory === cat.slug || selectedCategory === cat._id) {
       updateFilters({ category: '' });
     } else {
-      updateFilters({ category: slug });
+      updateFilters({ category: matchSlugOrId });
     }
   };
 
@@ -195,14 +199,17 @@ export function Shop() {
             <h4 className="font-mono-tag text-xs font-bold uppercase tracking-wider text-wagh-muted">Category</h4>
             <div className="space-y-2">
               {categories.map((cat) => {
-                const isSelected = selectedCategory === cat.slug;
+                const isSelected =
+                  selectedCategory === cat.slug ||
+                  selectedCategory === cat._id ||
+                  selectedCategory.toLowerCase() === cat.name.toLowerCase();
                 return (
                   <button
                     key={cat._id}
-                    onClick={() => handleCategoryToggle(cat.slug)}
+                    onClick={() => handleCategoryToggle(cat)}
                     className={`w-full text-left text-sm py-1.5 px-3 rounded-xl transition-all flex items-center justify-between ${
                       isSelected
-                        ? 'bg-wagh-teal text-white font-bold'
+                        ? 'bg-wagh-teal text-white font-bold shadow-xs'
                         : 'text-wagh-dark/80 hover:bg-wagh-teal/10 hover:text-wagh-teal font-medium'
                     }`}
                   >
@@ -233,21 +240,57 @@ export function Shop() {
 
         {/* PRODUCT GRID SECTION */}
         <main className="lg:col-span-9 space-y-6">
-          <div className="flex items-center justify-between text-xs font-mono-tag text-wagh-muted">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-mono-tag text-wagh-muted">
             <span>Showing {products.length} of {totalCount} products</span>
+
+            {/* Active Filter Badges */}
+            {(searchQueryParam || selectedCategory || minPriceParam || maxPriceParam || inStockParam) && (
+              <div className="flex flex-wrap items-center gap-2">
+                {searchQueryParam && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 text-wagh-teal font-bold border border-teal-200">
+                    Search: "{searchQueryParam}"
+                    <button onClick={() => updateFilters({ search: '' })} className="hover:text-rose-500">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {selectedCategory && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 text-wagh-teal font-bold border border-teal-200">
+                    Category: {categories.find(c => c.slug === selectedCategory || c._id === selectedCategory)?.name || selectedCategory}
+                    <button onClick={() => updateFilters({ category: '' })} className="hover:text-rose-500">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {(minPriceParam || maxPriceParam) && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 text-wagh-teal font-bold border border-teal-200">
+                    Price: ₹{minPriceParam || 0} - ₹{maxPriceParam || maxLimit}
+                    <button onClick={() => updateFilters({ minPrice: '', maxPrice: '' })} className="hover:text-rose-500">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                <button
+                  onClick={handleClearAll}
+                  className="text-xs text-wagh-teal underline font-bold hover:text-wagh-teal-dark ml-1"
+                >
+                  Clear All
+                </button>
+              </div>
+            )}
           </div>
 
           {loading ? (
             <LoadingSkeleton count={8} />
           ) : products.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-wagh-border p-12 text-center space-y-4">
-              <h3 className="font-editorial text-2xl font-bold text-wagh-dark">No products found</h3>
-              <p className="text-sm text-wagh-muted">Try adjusting your filters or search criteria.</p>
+            <div className="bg-white rounded-2xl border border-wagh-border p-12 text-center space-y-4 shadow-sm">
+              <h3 className="font-editorial text-2xl font-bold text-wagh-dark">No products found matching filters</h3>
+              <p className="text-sm text-wagh-muted">Try clearing search keywords or active filters to view all products.</p>
               <button
                 onClick={handleClearAll}
-                className="px-6 py-2.5 rounded-full bg-wagh-teal text-white text-xs font-bold hover:bg-wagh-teal-dark transition-colors"
+                className="px-6 py-2.5 rounded-full bg-wagh-teal text-white text-xs font-bold hover:bg-wagh-teal-dark transition-colors cursor-pointer shadow-sm"
               >
-                Clear Filters
+                Clear All Filters & View All Products
               </button>
             </div>
           ) : (

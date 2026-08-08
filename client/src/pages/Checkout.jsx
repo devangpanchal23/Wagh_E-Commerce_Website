@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { CheckCircle2, ShieldCheck, CreditCard, Truck, ArrowLeft, Zap } from 'lucide-react';
+import { ShoppingBag, ShieldCheck, CreditCard, CheckCircle2, AlertCircle, ArrowLeft, Lock } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchApi } from '../api';
+import { ProductImage } from '../components/ProductImage';
 
 export function Checkout() {
   const { cartItems, subtotal, shippingFee, grandTotal, clearCart } = useCart();
@@ -437,10 +438,11 @@ export function Checkout() {
           <div className="max-h-60 overflow-y-auto space-y-3 pr-2">
             {cartItems.map((item) => (
               <div key={item.product._id || item.product} className="flex items-center gap-3.5 text-xs py-1">
-                <img
-                  src={item.product.images?.[0] || 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600'}
+                <ProductImage
+                  src={item.product.images}
                   alt={item.product.name}
-                  className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-xl bg-gray-50 border border-wagh-border p-1.5 shrink-0 shadow-2xs"
+                  variant="thumbnail"
+                  className="w-16 h-16 sm:w-20 sm:h-20 shrink-0"
                 />
                 <div className="flex-1 min-w-0">
                   <h4 className="font-bold text-wagh-dark text-sm truncate">{item.product.name}</h4>

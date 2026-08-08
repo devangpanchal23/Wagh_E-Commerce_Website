@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { CheckoutButton } from '../components/CheckoutButton';
+import { ProductImage } from '../components/ProductImage';
 
 export function Cart() {
   const { cartItems, updateQty, removeFromCart, clearCart, subtotal, shippingFee, grandTotal } = useCart();
@@ -117,12 +118,13 @@ export function Cart() {
                 <div className="flex items-start gap-3.5 sm:gap-4 w-full min-w-0">
                   <Link
                     to={`/product/${pId}`}
-                    className="w-20 h-20 sm:w-24 sm:h-24 bg-gray-50 rounded-2xl p-1.5 shrink-0 border border-wagh-border flex items-center justify-center shadow-2xs overflow-hidden group"
+                    className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 block"
                   >
-                    <img
-                      src={product.images && product.images.length > 0 ? product.images[0] : 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600'}
+                    <ProductImage
+                      src={product.images}
                       alt={product.name}
-                      className="w-full h-full object-contain p-1 transform group-hover:scale-105 transition-transform duration-300"
+                      variant="thumbnail"
+                      className="w-full h-full"
                     />
                   </Link>
 

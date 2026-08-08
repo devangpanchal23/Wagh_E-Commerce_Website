@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingBag, Heart, Eye, Zap } from 'lucide-react';
 import { RatingStars } from './RatingStars';
+import { ProductImage } from './ProductImage';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 
@@ -51,12 +52,12 @@ export function ProductCard({ product }) {
       </div>
 
       {/* Product Image */}
-      <Link to={`/product/${product._id}`} className="block relative my-4 aspect-square overflow-hidden rounded-xl bg-gray-50 flex items-center justify-center p-2">
-        <img
-          src={product.images && product.images.length > 0 ? product.images[0] : 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600'}
+      <Link to={`/product/${product._id}`} className="block relative my-4">
+        <ProductImage
+          src={product.images}
           alt={product.name}
-          className="w-full h-full object-contain transform group-hover:scale-105 transition-transform duration-500"
-          loading="lazy"
+          variant="card"
+          imgClassName="group-hover:scale-105 transition-transform duration-500"
         />
       </Link>
 

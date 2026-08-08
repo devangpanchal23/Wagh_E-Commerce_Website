@@ -22,12 +22,24 @@ exports.getProducts = async (req, res, next) => {
 
     // Category filter
     if (req.query.category) {
-      const categories = req.query.category.split(',');
+      const categories = req.query.category.split(',').map(c => c.trim()).filter(Boolean);
+      const validObjectIds = categories.filter(c => c.match(/^[0-9a-fA-F]{24}$/));
+
       const catObjs = await Category.find({
-        $or: [{ _id: { $in: categories.filter(c => c.match(/^[0-9a-fA-F]{24}$/)) } }, { slug: { $in: categories } }]
+        $or: [
+          { _id: { $in: validObjectIds } },
+          { slug: { $in: categories } },
+          { name: { $in: categories.map(c => new RegExp(`^${c.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i')) } }
+        ]
       });
-      if (catObjs.length > 0) {
-        query.category = { $in: catObjs.map(c => c._id) };
+
+      const matchedCategoryIds = Array.from(new Set([
+        ...catObjs.map(c => c._id.toString()),
+        ...validObjectIds
+      ]));
+
+      if (matchedCategoryIds.length > 0) {
+        query.category = { $in: matchedCategoryIds };
       }
     }
 
