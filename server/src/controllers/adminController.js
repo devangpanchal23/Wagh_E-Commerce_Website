@@ -209,10 +209,39 @@ exports.getAdminProducts = async (req, res, next) => {
   }
 };
 
+function sanitizeSections(sections) {
+  if (!Array.isArray(sections)) return [];
+
+  return sections.map((sec, secIdx) => {
+    const rawItems = Array.isArray(sec.items) ? sec.items : [];
+    const sanitizedItems = rawItems
+      .filter((item) => item && (item.label?.trim() || item.value?.trim()))
+      .slice(0, 20)
+      .map((item, iIdx) => ({
+        label: item.label ? item.label.trim() : '',
+        value: item.value ? item.value.trim() : '',
+        order: typeof item.order === 'number' ? item.order : iIdx,
+      }));
+
+    return {
+      title: sec.title ? sec.title.trim() : 'Section',
+      type: ['specifications', 'keyFeatures', 'details', 'table', 'list', 'text'].includes(sec.type)
+        ? sec.type
+        : 'table',
+      items: sanitizedItems,
+      content: sec.content ? sec.content.trim() : '',
+      order: typeof sec.order === 'number' ? sec.order : secIdx,
+    };
+  });
+}
+
 // @desc    Create product (admin)
 // @route   POST /api/v1/admin/products
 exports.createAdminProduct = async (req, res, next) => {
   try {
+    if (req.body.sections) {
+      req.body.sections = sanitizeSections(req.body.sections);
+    }
     const product = await Product.create(req.body);
     res.status(201).json({
       success: true,
@@ -233,6 +262,10 @@ exports.updateAdminProduct = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
+    if (req.body.sections) {
+      req.body.sections = sanitizeSections(req.body.sections);
+    }
+
     product = await Product.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true,
@@ -247,6 +280,7 @@ exports.updateAdminProduct = async (req, res, next) => {
     next(error);
   }
 };
+
 
 // @desc    Delete product (admin)
 // @route   DELETE /api/v1/admin/products/:id

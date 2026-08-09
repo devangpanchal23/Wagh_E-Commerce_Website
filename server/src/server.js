@@ -12,6 +12,7 @@ const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const googleDriveRoutes = require('./routes/googleDriveRoutes');
 const extraRoutes = require('./routes/extraRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -48,7 +49,9 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // API Routes (versioned /api/v1)
+app.use('/api/v1/admin/google-drive', googleDriveRoutes);
 app.use('/api/v1/admin', adminRoutes);
+
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/categories', categoryRoutes);

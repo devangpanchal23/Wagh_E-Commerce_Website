@@ -53,18 +53,24 @@ const productSchema = new mongoose.Schema({
   },
   sections: [
     {
-      title: { type: String, required: true },
-      type: { type: String, enum: ['list', 'table', 'text'], default: 'table' },
+      title: { type: String, required: true, trim: true },
+      type: {
+        type: String,
+        enum: ['specifications', 'keyFeatures', 'details', 'table', 'list', 'text'],
+        default: 'table'
+      },
       items: [
         {
-          label: { type: String, default: '' },
-          value: { type: String, default: '' }
+          label: { type: String, default: '', trim: true },
+          value: { type: String, default: '', trim: true },
+          order: { type: Number, default: 0 }
         }
       ],
       content: { type: String, default: '' },
       order: { type: Number, default: 0 }
     }
   ],
+
   stock: {
     type: Number,
     required: true,

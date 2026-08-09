@@ -3,13 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import {
   ShieldAlert, ShieldCheck, Lock, Key, Package, ShoppingBag, Users, DollarSign,
   Plus, Edit, Trash2, CheckCircle2, AlertCircle, LogOut, Calendar, Filter,
-  Clock, TrendingUp, Search, ChevronDown, ChevronRight, CheckCircle, Truck, XCircle, Check, Ruler,
-  Upload, Image as ImageIcon, Layers, Grid, ArrowUp, ArrowDown, FileText, List, Table, Crop, RefreshCw
+  Clock, TrendingUp, Search, ChevronDown, ChevronRight, CheckCircle, Truck, XCircle, X, Check, Ruler,
+  Upload, Image as ImageIcon, Layers, Grid, ArrowUp, ArrowDown, FileText, List, Table, Crop, RefreshCw, HardDrive
 } from 'lucide-react';
+
 import { useToast } from '../context/ToastContext';
 import { fetchAdminApi } from '../api';
 import { AdminLoginForm } from '../components/AdminLoginForm';
 import { ImageCropModal } from '../components/admin/ImageCropModal';
+import { GoogleDrivePickerButton } from '../components/GoogleDrivePickerButton';
 
 // Custom Order Status Dropdown Component
 function OrderStatusDropdown({ currentStatus, onStatusChange }) {
@@ -172,16 +174,24 @@ export function Admin() {
     category: '',
     brand: 'WAGH',
     stock: 100,
-    images: [], // array of image objects/urls
-    outputPower: '45W PPS',
-    dimensions: '12.5 × 6.5 × 2.1 cm',
-    size: 'Height: 12.5 cm | Width: 6.5 cm',
-    warranty: '24 Months Replacement',
+    images: [],
+    outputPower: '',
+    dimensions: '',
+    size: '',
+    warranty: '',
+    compatibility: '',
+    cableLength: '',
+    height: '',
+    width: '',
+    color: '',
+    material: '',
     isFeatured: false,
     isNewArrival: false,
     isBestSeller: false,
-    sections: [], // Task 4: structured sections
+    sections: [],
   });
+
+
 
   const loadAdminData = async () => {
     setLoading(true);
@@ -354,11 +364,15 @@ export function Admin() {
     }
   };
 
-  const handleSelectLocalFile = (e) => {
-    const file = e.target.files?.[0];
+  const processImageFile = (file) => {
     if (!file) return;
 
-    if (!/\.(jpg|jpeg|png|webp|svg)$/i.test(file.name)) {
+    if (productForm.images?.length >= 4) {
+      addToast('Maximum 4 images allowed per product.', 'error');
+      return;
+    }
+
+    if (!/\.(jpg|jpeg|png|webp|svg)$/i.test(file.name) && !file.type?.startsWith('image/')) {
       addToast('Invalid file format. Please upload JPG, PNG, WEBP, or SVG images.', 'error');
       return;
     }
@@ -371,6 +385,13 @@ export function Admin() {
     setCropImageSrc(objectUrl);
     setReCropIndex(null);
     setShowCropModal(true);
+  };
+
+  const handleSelectLocalFile = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processImageFile(file);
+    }
   };
 
   const handleCropComplete = async (croppedFile) => {
@@ -419,6 +440,11 @@ export function Admin() {
   };
 
   const handleSelectGalleryImage = (mediaItem) => {
+    if (productForm.images?.length >= 4) {
+      addToast('Maximum 4 images allowed per product.', 'error');
+      return;
+    }
+
     const exists = productForm.images.some(
       (img) => (typeof img === 'string' ? img === mediaItem.url : img.url === mediaItem.url)
     );
@@ -436,6 +462,7 @@ export function Admin() {
     setProductForm((prev) => ({ ...prev, images: [...prev.images, newImgObj] }));
     addToast('Added image from Cloud gallery', 'success');
   };
+
 
   const handleSetPrimaryImage = (idx) => {
     const updated = productForm.images.map((img, i) => {
@@ -462,17 +489,17 @@ export function Admin() {
     setShowCropModal(true);
   };
 
-  // Section Builder Handlers for Task 4
-  const handleAddSection = (type = 'table') => {
+  const handleAddSection = (type = 'specifications') => {
     const newSection = {
-      title: type === 'table' ? 'Specifications' : type === 'list' ? 'Key Features' : 'Additional Details',
+      title: type === 'specifications' || type === 'table' ? 'Specifications' : type === 'keyFeatures' || type === 'list' ? 'Key Features' : 'Product Details',
       type: type,
-      items: type !== 'text' ? [{ label: 'Feature', value: 'Details' }] : [],
+      items: type !== 'text' && type !== 'details' ? [{ label: 'Feature', value: 'Details', order: 0 }] : [],
       content: '',
       order: (productForm.sections || []).length,
     };
     setProductForm((prev) => ({ ...prev, sections: [...(prev.sections || []), newSection] }));
   };
+
 
   const handleRemoveSection = (secIdx) => {
     setProductForm((prev) => ({
@@ -505,10 +532,16 @@ export function Admin() {
         stock: Number(productForm.stock),
         images: productForm.images.length > 0 ? productForm.images : ['https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600'],
         specs: {
-          outputPower: productForm.outputPower,
-          dimensions: productForm.dimensions,
-          size: productForm.size,
-          warranty: productForm.warranty,
+          outputPower: productForm.outputPower || '',
+          dimensions: productForm.dimensions || '',
+          size: productForm.size || '',
+          warranty: productForm.warranty || '',
+          compatibility: productForm.compatibility || '',
+          cableLength: productForm.cableLength || '',
+          height: productForm.height || '',
+          width: productForm.width || '',
+          color: productForm.color || '',
+          material: productForm.material || '',
         },
         sections: productForm.sections || [],
         isFeatured: productForm.isFeatured,
@@ -574,6 +607,7 @@ export function Admin() {
     setEditingProductId(null);
     setModalTab('basic');
     setImageSourceTab('upload');
+
     setProductForm({
       name: '',
       description: '',
@@ -582,43 +616,26 @@ export function Admin() {
       category: categories[0]?._id || '',
       brand: 'WAGH',
       stock: 100,
-      images: [
-        { url: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=800', isPrimary: true },
-        { url: 'https://images.unsplash.com/photo-1622445268465-843dcb642733?w=800', isPrimary: false },
-        { url: 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=800', isPrimary: false }
-      ],
-      outputPower: '45W PPS Super Fast',
-      dimensions: '12.5 × 6.5 × 2.1 cm',
-      size: 'Height: 12.5 cm | Width: 6.5 cm',
-      warranty: '24 Months Replacement',
-      isFeatured: true,
-      isNewArrival: true,
+      images: [],
+      outputPower: '',
+      dimensions: '',
+      size: '',
+      warranty: '',
+      compatibility: '',
+      cableLength: '',
+      height: '',
+      width: '',
+      color: '',
+      material: '',
+      isFeatured: false,
+      isNewArrival: false,
       isBestSeller: false,
-      sections: [
-        {
-          title: 'Technical Specifications',
-          type: 'table',
-          items: [
-            { label: 'Charging Protocol', value: 'Samsung SFC 2.0 / PPS 45W' },
-            { label: 'Input Voltage', value: '100-240V ~ 50/60Hz 1.2A' },
-            { label: 'Safety Certifications', value: 'BIS Certified, CE, FCC' }
-          ],
-          order: 0
-        },
-        {
-          title: 'Key Features & Benefits',
-          type: 'list',
-          items: [
-            { label: 'Aerospace GaN III', value: 'Reduces heat emission by 35% compared to silicon chargers.' },
-            { label: '10-Layer Protection', value: 'Built-in overvoltage, surge, and short-circuit safeguards.' }
-          ],
-          order: 1
-        }
-      ]
+      sections: []
     });
     fetchMediaGallery();
     setShowProductModal(true);
   };
+
 
   const openEditModal = (p) => {
     setEditingProductId(p._id);
@@ -634,14 +651,21 @@ export function Admin() {
       stock: p.stock || 100,
       images: Array.isArray(p.images) ? p.images : [],
       outputPower: p.specs?.outputPower || '',
-      dimensions: p.specs?.dimensions || p.specs?.size || '',
-      size: p.specs?.size || (p.specs?.height && p.specs?.width ? `Height: ${p.specs.height} | Width: ${p.specs.width}` : ''),
+      dimensions: p.specs?.dimensions || '',
+      size: p.specs?.size || '',
       warranty: p.specs?.warranty || '',
+      compatibility: p.specs?.compatibility || '',
+      cableLength: p.specs?.cableLength || '',
+      height: p.specs?.height || '',
+      width: p.specs?.width || '',
+      color: p.specs?.color || '',
+      material: p.specs?.material || '',
       isFeatured: !!p.isFeatured,
       isNewArrival: !!p.isNewArrival,
       isBestSeller: !!p.isBestSeller,
       sections: p.sections || []
     });
+
     fetchMediaGallery();
     setShowProductModal(true);
   };
@@ -1223,12 +1247,14 @@ export function Admin() {
                   <div>
                     <label className="block text-slate-700 mb-1 font-semibold">Short Summary / Description</label>
                     <textarea
-                      rows={3}
+                      rows={4}
                       required
+                      placeholder="Enter product description or bullet points on new lines (e.g. • Feature 1)"
                       value={productForm.description}
                       onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                      className="w-full p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-wagh-teal text-xs"
+                      className="w-full p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-wagh-teal text-xs font-sans"
                     />
+
                   </div>
 
                   {/* Toggles */}
@@ -1299,8 +1325,10 @@ export function Admin() {
                       </div>
                     </div>
 
-                    {/* Path 1: Local Upload & Crop Trigger */}
+
+                    {/* Path 2: Local Upload & Crop Trigger */}
                     {imageSourceTab === 'upload' && (
+
                       <div className="border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center hover:border-wagh-teal transition-all bg-white space-y-3">
                         <Upload className="w-8 h-8 text-wagh-teal mx-auto animate-bounce" />
                         <div>
@@ -1333,7 +1361,7 @@ export function Admin() {
                         ) : galleryImages.length === 0 ? (
                           <div className="py-8 text-center text-slate-400 text-xs">No uploaded media images found in gallery.</div>
                         ) : (
-                          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5 max-h-48 overflow-y-auto p-1">
+                          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5 max-h-48 overflow-y-auto p-1 custom-gallery-scrollbar pr-2">
                             {galleryImages.map((media) => (
                               <div
                                 key={media.publicId}
@@ -1426,33 +1454,168 @@ export function Admin() {
                 </div>
               )}
 
-              {/* TAB 3: STRUCTURED PRODUCT DETAILS BUILDER (TASK 4) */}
+              {/* TAB 3: STRUCTURED PRODUCT DETAILS & SPECIFICATIONS */}
               {modalTab === 'sections' && (
                 <div className="space-y-6 animate-fade-in">
                   
+                  {/* Block 1: 10 Recommended & Optional Specifications Grid */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                          <Ruler className="w-4 h-4 text-wagh-teal" />
+                          <span>Product Specifications (Optional & Recommended)</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-500">Fill in any attributes relevant to this product. Empty fields stay empty or show fallback.</p>
+                      </div>
+                      <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 bg-wagh-teal/10 text-wagh-teal rounded-lg">10 Attributes</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Output Power</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 45W PPS Super Fast"
+                          value={productForm.outputPower || ''}
+                          onChange={(e) => setProductForm({ ...productForm, outputPower: e.target.value })}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-wagh-teal bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Dimensions</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 12.5 × 6.5 × 2.1 cm"
+                          value={productForm.dimensions || ''}
+                          onChange={(e) => setProductForm({ ...productForm, dimensions: e.target.value })}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-wagh-teal bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Size / Form Factor</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Height: 12.5 cm | Width: 6.5 cm"
+                          value={productForm.size || ''}
+                          onChange={(e) => setProductForm({ ...productForm, size: e.target.value })}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-wagh-teal bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Warranty</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 24 Months Replacement"
+                          value={productForm.warranty || ''}
+                          onChange={(e) => setProductForm({ ...productForm, warranty: e.target.value })}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-wagh-teal bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Compatibility</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Universal, iPhone 15/16, Samsung S24"
+                          value={productForm.compatibility || ''}
+                          onChange={(e) => setProductForm({ ...productForm, compatibility: e.target.value })}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-wagh-teal bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Cable Length</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 1.2 Meters / 4 Feet"
+                          value={productForm.cableLength || ''}
+                          onChange={(e) => setProductForm({ ...productForm, cableLength: e.target.value })}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-wagh-teal bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Height</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 12.5 cm"
+                          value={productForm.height || ''}
+                          onChange={(e) => setProductForm({ ...productForm, height: e.target.value })}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-wagh-teal bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Width</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 6.5 cm"
+                          value={productForm.width || ''}
+                          onChange={(e) => setProductForm({ ...productForm, width: e.target.value })}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-wagh-teal bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Color</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Deep Teal / Midnight Black"
+                          value={productForm.color || ''}
+                          onChange={(e) => setProductForm({ ...productForm, color: e.target.value })}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-wagh-teal bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Material</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Aerospace GaN III / TPE"
+                          value={productForm.material || ''}
+                          onChange={(e) => setProductForm({ ...productForm, material: e.target.value })}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-wagh-teal bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Section Controls Toolbar */}
                   <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <h4 className="font-bold text-slate-900 text-sm">Structured Details & Specifications</h4>
-                      <p className="text-[11px] text-slate-500">Organize specifications into structured tables, bullet lists, or free text sections.</p>
+                      <h4 className="font-bold text-slate-900 text-sm">Custom Structured Sections (Optional)</h4>
+                      <p className="text-[11px] text-slate-500">Add custom tables or feature lists for additional unique product details.</p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => handleAddSection('table')}
+                        onClick={() => handleAddSection('specifications')}
                         className="px-3 py-1.5 rounded-xl bg-wagh-teal text-white font-bold text-xs hover:bg-wagh-teal-dark flex items-center gap-1.5 cursor-pointer shadow-xs"
                       >
                         <Table className="w-3.5 h-3.5" />
-                        <span>+ Specs Table</span>
+                        <span>+ Specifications Table</span>
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleAddSection('list')}
+                        onClick={() => handleAddSection('keyFeatures')}
                         className="px-3 py-1.5 rounded-xl bg-slate-800 text-white font-bold text-xs hover:bg-slate-900 flex items-center gap-1.5 cursor-pointer shadow-xs"
                       >
                         <List className="w-3.5 h-3.5" />
                         <span>+ Features List</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddSection('details')}
+                        className="px-3 py-1.5 rounded-xl bg-amber-700 text-white font-bold text-xs hover:bg-amber-800 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>+ Details Text</span>
                       </button>
                     </div>
                   </div>
@@ -1460,7 +1623,7 @@ export function Admin() {
                   {/* Sections List */}
                   {productForm.sections?.length === 0 ? (
                     <div className="p-8 text-center border border-dashed border-slate-200 rounded-2xl text-slate-400 text-xs">
-                      No structured sections added yet. Click "+ Specs Table" or "+ Features List" above to add structured product details.
+                      No structured sections added yet. Click "+ Specifications Table" or "+ Features List" above to add custom sections.
                     </div>
                   ) : (
                     <div className="space-y-4">
@@ -1470,9 +1633,24 @@ export function Admin() {
                           {/* Section Card Header */}
                           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-2">
                             <div className="flex items-center gap-2 flex-1">
-                              <span className="p-1.5 rounded-lg bg-slate-100 text-slate-600 font-bold text-[10px] uppercase">
-                                {sec?.type || 'table'}
-                              </span>
+                              <select
+                                value={sec?.type || 'specifications'}
+                                onChange={(e) => {
+                                  const updated = [...(productForm.sections || [])];
+                                  if (updated[secIdx]) {
+                                    updated[secIdx].type = e.target.value;
+                                    setProductForm({ ...productForm, sections: updated });
+                                  }
+                                }}
+                                className="p-1.5 rounded-lg border border-slate-300 font-bold text-slate-700 text-xs bg-slate-50 focus:ring-2 focus:ring-wagh-teal"
+                              >
+                                <option value="specifications">Specifications Table</option>
+                                <option value="keyFeatures">Key Features List</option>
+                                <option value="details">Details Text</option>
+                                <option value="table">Custom Table</option>
+                                <option value="list">Custom List</option>
+                              </select>
+
                               <input
                                 type="text"
                                 value={sec?.title || ''}
@@ -1488,6 +1666,7 @@ export function Admin() {
                                 className="p-1.5 rounded-lg border border-slate-300 font-bold text-slate-900 text-xs flex-1 focus:ring-2 focus:ring-wagh-teal"
                               />
                             </div>
+
 
                             <div className="flex items-center gap-1">
                               <button

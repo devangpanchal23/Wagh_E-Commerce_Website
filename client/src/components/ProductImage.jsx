@@ -44,10 +44,11 @@ export function ProductImage({
 
   // Variant size/style presets
   const variantStyles = {
-    thumbnail: 'p-1 rounded-xl bg-slate-50 border border-slate-200/80',
-    card: 'p-2 rounded-2xl bg-slate-50 border border-slate-100',
-    detail: 'p-4 sm:p-6 rounded-3xl bg-white border border-slate-200 shadow-soft',
+    thumbnail: 'p-0.5 rounded-xl bg-white border border-slate-200/60',
+    card: 'p-0 rounded-2xl bg-white border border-slate-200/60 overflow-hidden',
+    detail: 'p-0 rounded-3xl bg-white border border-slate-200/60 overflow-hidden shadow-2xs',
   };
+
 
   const containerPreset = variantStyles[variant] || variantStyles.card;
 

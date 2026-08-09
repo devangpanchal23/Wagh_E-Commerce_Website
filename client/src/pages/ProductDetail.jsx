@@ -10,7 +10,43 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useToast } from '../context/ToastContext';
 
+// Formatted Multi-Line & Bullet Text Component
+function FormattedText({ text, title = null, className = '' }) {
+  if (!text) return null;
+
+  const rawLines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (rawLines.length === 0) return null;
+
+  return (
+    <div className={`space-y-3 ${className}`}>
+      {title && (
+        <h4 className="font-editorial text-xl font-bold text-slate-900 mb-3">
+          {title}
+        </h4>
+      )}
+      <ul className="space-y-3 pl-1">
+        {rawLines.map((line, idx) => {
+          const cleanLine = line.replace(/^([•\-*▪]|(\d+[\.\)]))\s*/, '');
+
+          return (
+            <li
+              key={idx}
+              className="flex items-start gap-3 text-slate-600 text-sm sm:text-base leading-relaxed font-sans"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0 mt-2.5" />
+              <span className="flex-1 break-words">{cleanLine}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+
+
 export function ProductDetail() {
+
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
@@ -166,14 +202,14 @@ export function ProductDetail() {
           {/* Main Hero Image Container with Zoom Trigger */}
           <div
             onClick={() => setLightboxOpen(true)}
-            className="relative cursor-zoom-in group rounded-3xl overflow-hidden shadow-soft border border-slate-200 bg-white"
+            className="relative cursor-zoom-in group rounded-3xl overflow-hidden border border-slate-200/60 bg-white shadow-2xs"
             title="Click to view fullscreen"
           >
             <ProductImage
               src={product.images?.[selectedImage] || product.images}
               alt={product.name}
               variant="detail"
-              className="w-full h-full border-0 p-4 sm:p-6"
+              className="w-full h-full border-0 p-0"
             />
 
             {discountPercent > 0 && (
@@ -201,10 +237,10 @@ export function ProductDetail() {
                   <button
                     key={idx}
                     onClick={() => setSelectedImage(idx)}
-                    className={`relative aspect-square rounded-2xl overflow-hidden transition-all duration-200 cursor-pointer p-0.5 bg-white ${
+                    className={`relative aspect-square rounded-2xl overflow-hidden transition-all duration-200 cursor-pointer p-0 bg-white ${
                       isSelected
-                        ? 'border-2 border-wagh-teal ring-2 ring-wagh-teal/20 shadow-md scale-105 z-10'
-                        : 'border border-slate-200 hover:border-slate-300 hover:opacity-90'
+                        ? 'border-2 border-wagh-teal ring-2 ring-wagh-teal/20 shadow-xs scale-105 z-10'
+                        : 'border border-slate-200/60 hover:border-slate-300 hover:opacity-90'
                     }`}
                     title={`View Image ${idx + 1}`}
                   >
@@ -212,13 +248,14 @@ export function ProductDetail() {
                       src={img}
                       alt={`Thumbnail ${idx + 1}`}
                       variant="thumbnail"
-                      className="w-full h-full p-1 border-0 rounded-xl bg-slate-50/50"
+                      className="w-full h-full p-0 border-0 rounded-xl"
                     />
                   </button>
                 );
               })}
             </div>
           )}
+
         </div>
 
         {/* FULLSCREEN LIGHTBOX VIEWER MODAL */}
@@ -312,66 +349,84 @@ export function ProductDetail() {
 
         {/* PRODUCT SUMMARY & BUY ACTIONS */}
         <div className="lg:col-span-6 space-y-6">
-          <div className="space-y-2">
-            <span className="font-mono-tag text-xs font-bold uppercase tracking-wider text-wagh-teal bg-wagh-teal/10 px-3 py-1 rounded-full">
+          <div className="space-y-2.5">
+            <span className="inline-block font-mono-tag text-[10px] font-bold uppercase tracking-widest text-[#0f4b3f] bg-[#0f4b3f]/10 px-3 py-1 rounded-md border border-[#0f4b3f]/15">
               {product.brand || 'WAGH'}
             </span>
-            <h1 className="font-editorial text-3xl sm:text-4xl font-extrabold text-wagh-dark leading-tight">
+            <h1 className="font-editorial text-2xl sm:text-3xl font-extrabold text-slate-900 leading-tight">
               {product.name}
             </h1>
-            <RatingStars rating={product.ratingAvg || 4.9} count={product.ratingCount || 24} />
+            <div className="flex items-center gap-2 pt-0.5">
+              <RatingStars rating={product.ratingAvg || 4.8} count={product.ratingCount || 24} />
+            </div>
           </div>
 
           {/* Price Block */}
-          <div className="p-4 rounded-2xl bg-white border border-wagh-border flex items-baseline gap-4 shadow-sm">
-            <span className="font-mono-tag text-3xl font-extrabold text-wagh-teal">
-              ₹{product.price}
-            </span>
-            {product.mrp > product.price && (
-              <span className="font-mono-tag text-base text-wagh-muted line-through">
-                MRP ₹{product.mrp}
+          <div className="p-4 rounded-2xl bg-white border border-slate-200/80 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-baseline gap-3">
+              <span className="font-mono-tag text-3xl font-extrabold text-[#0f4b3f]">
+                ₹{product.price}
               </span>
-            )}
-            <span className="text-xs font-mono-tag text-wagh-success font-bold ml-auto">
+              {product.mrp > product.price && (
+                <span className="font-mono-tag text-sm text-slate-400 line-through font-medium">
+                  MRP ₹{product.mrp}
+                </span>
+              )}
+              {discountPercent > 0 && (
+                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wider font-mono-tag">
+                  {discountPercent}% OFF
+                </span>
+              )}
+            </div>
+            <span className="font-mono-tag text-xs font-bold text-[#0f4b3f] ml-auto">
               Inclusive of all taxes
             </span>
           </div>
 
           {/* Quick Spec Highlights */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono-tag text-wagh-dark">
-            <div className="p-3 rounded-xl bg-gray-50 border border-wagh-border/60">
-              <span className="text-wagh-muted block text-[10px] uppercase">OUTPUT POWER</span>
-              <span className="font-bold text-wagh-teal truncate block">{product.specs?.outputPower || '45W PPS Super Fast'}</span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-[#0f4b3f]/30 transition-all flex flex-col justify-between">
+              <span className="font-mono-tag text-slate-400 block text-[10px] font-bold uppercase tracking-wider mb-1">OUTPUT POWER</span>
+              <span className="font-mono-tag font-bold text-[#0f4b3f] text-xs sm:text-sm leading-snug break-words">
+                {product.specs?.outputPower || '45W PPS Super Fast'}
+              </span>
             </div>
-            <div className="p-3 rounded-xl bg-gray-50 border border-wagh-border/60">
-              <span className="text-wagh-muted block text-[10px] uppercase flex items-center gap-1">
-                <Ruler className="w-3 h-3 text-wagh-teal shrink-0" />
+            
+            <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-[#0f4b3f]/30 transition-all flex flex-col justify-between">
+              <span className="font-mono-tag text-slate-400 block text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Ruler className="w-3 h-3 text-[#0f4b3f] shrink-0" />
                 <span>SIZE & DIMENSIONS</span>
               </span>
-              <span className="font-bold text-wagh-teal truncate block">
+              <span className="font-mono-tag font-bold text-[#0f4b3f] text-xs sm:text-sm leading-snug break-words">
                 {product.specs?.dimensions || product.specs?.size || (product.specs?.height && product.specs?.width ? `${product.specs.height} × ${product.specs.width}` : '12.5 × 6.5 cm')}
               </span>
             </div>
-            <div className="p-3 rounded-xl bg-gray-50 border border-wagh-border/60">
-              <span className="text-wagh-muted block text-[10px] uppercase">WARRANTY</span>
-              <span className="font-bold text-wagh-teal truncate block">{product.specs?.warranty || '24 Months Replacement'}</span>
+
+            <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-[#0f4b3f]/30 transition-all flex flex-col justify-between">
+              <span className="font-mono-tag text-slate-400 block text-[10px] font-bold uppercase tracking-wider mb-1">WARRANTY</span>
+              <span className="font-mono-tag font-bold text-[#0f4b3f] text-xs sm:text-sm leading-snug break-words">
+                {product.specs?.warranty || '24 Months Replacement'}
+              </span>
             </div>
           </div>
 
-          {/* Quantity Stepper */}
-          <div className="flex items-center gap-4 pt-2">
-            <span className="text-xs font-mono-tag font-bold uppercase text-wagh-muted">Quantity</span>
-            <div className="flex items-center border border-wagh-border rounded-xl bg-white">
+          {/* Quantity Stepper & Wishlist */}
+          <div className="flex items-center gap-4 pt-1">
+            <span className="font-mono-tag text-xs font-bold uppercase text-slate-400 tracking-wider">QUANTITY</span>
+            
+            <div className="flex items-center rounded-2xl border border-slate-200/80 bg-white p-1 shadow-2xs">
               <button
                 onClick={() => setQty(Math.max(1, qty - 1))}
-                className="px-3.5 py-1.5 text-wagh-dark font-bold hover:bg-gray-100 rounded-l-xl"
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold font-mono-tag text-sm transition-colors cursor-pointer"
+                title="Decrease quantity"
               >
                 -
               </button>
-              <span className="px-4 font-mono-tag font-bold text-sm text-wagh-dark">{qty}</span>
+              <span className="w-10 text-center font-mono-tag font-bold text-sm text-slate-900">{qty}</span>
               <button
                 onClick={() => setQty(qty + 1)}
-                className="px-3.5 py-1.5 text-wagh-dark font-bold hover:bg-gray-100 rounded-r-xl"
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold font-mono-tag text-sm transition-colors cursor-pointer"
+                title="Increase quantity"
               >
                 +
               </button>
@@ -379,31 +434,35 @@ export function ProductDetail() {
 
             <button
               onClick={() => toggleWishlist(product)}
-              className={`p-3 rounded-xl border transition-colors ${
-                isLiked ? 'bg-red-50 border-red-200 text-wagh-error' : 'border-wagh-border text-gray-500 hover:text-wagh-error'
+              className={`w-10 h-10 flex items-center justify-center rounded-2xl border transition-all shadow-2xs cursor-pointer ${
+                isLiked
+                  ? 'bg-rose-50 border-rose-200 text-rose-600'
+                  : 'bg-white border-slate-200/80 text-slate-500 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50'
               }`}
+              title={isLiked ? 'Remove from Wishlist' : 'Add to Wishlist'}
             >
-              <Heart className={`w-5 h-5 ${isLiked ? 'fill-wagh-error' : ''}`} />
+              <Heart className={`w-4 h-4 ${isLiked ? 'fill-rose-600 text-rose-600' : ''}`} />
             </button>
           </div>
 
           {/* Add to Cart & Buy Now Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
             <button
               onClick={() => addToCart(product, qty)}
-              className="py-4 rounded-full bg-wagh-teal text-white font-extrabold text-sm hover:bg-wagh-teal-dark transition-all duration-200 shadow-md flex items-center justify-center gap-2 active:scale-95"
+              className="py-4 px-6 rounded-2xl bg-[#0f4b3f] hover:bg-[#0a352c] text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-md hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer"
             >
               <ShoppingBag className="w-5 h-5" />
               <span>Add to Cart</span>
             </button>
             <button
               onClick={handleBuyNow}
-              className="py-4 rounded-full bg-wagh-gold text-wagh-dark font-extrabold text-sm hover:bg-wagh-gold-light transition-all duration-200 shadow-md flex items-center justify-center gap-2 active:scale-95"
+              className="py-4 px-6 rounded-2xl bg-[#d4a34b] hover:bg-[#c3923a] text-slate-950 font-bold text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-md hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer"
             >
-              <Zap className="w-5 h-5 fill-wagh-dark" />
+              <Zap className="w-5 h-5 fill-slate-950" />
               <span>Buy Now</span>
             </button>
           </div>
+
 
           {/* Trust Guarantees */}
           <div className="space-y-3 pt-4 border-t border-wagh-border text-xs text-wagh-dark">
@@ -429,16 +488,17 @@ export function ProductDetail() {
         const sectionsList = product?.sections?.filter(Boolean) || [];
 
         const specSections = sectionsList.filter(s =>
-          s.type === 'table' || /spec|technical|dimension|size/i.test(s.title || '')
+          s.type === 'specifications' || s.type === 'table' || /spec|technical|dimension|size/i.test(s.title || '')
         );
 
         const featureSections = sectionsList.filter(s =>
-          s.type === 'list' || /feature|benefit|highlight/i.test(s.title || '')
+          s.type === 'keyFeatures' || s.type === 'list' || /feature|benefit|highlight/i.test(s.title || '')
         );
 
         const textOverviewSections = sectionsList.filter(s =>
-          s.type === 'text' || /overview|description|about/i.test(s.title || '')
+          s.type === 'details' || s.type === 'text' || /overview|description|about/i.test(s.title || '')
         );
+
 
         const hasFeatures = featureSections.length > 0 || sectionsList.length === 0;
 
@@ -473,14 +533,14 @@ export function ProductDetail() {
               {/* TAB 1: DESCRIPTION */}
               {activeTab === 'description' && (
                 <div className="space-y-6 text-wagh-dark text-sm sm:text-base leading-relaxed">
-                  <p className="text-slate-700 leading-relaxed font-sans">{product.description}</p>
+                  <FormattedText text={product.description} />
                   
                   {textOverviewSections.length > 0 && (
                     <div className="space-y-4 pt-4 border-t border-slate-100">
                       {textOverviewSections.map((sec, sIdx) => (
                         <div key={sIdx} className="space-y-2">
                           <h4 className="font-editorial text-lg font-bold text-wagh-dark">{sec.title}</h4>
-                          <p className="text-slate-600 text-sm leading-relaxed font-sans">{sec.content}</p>
+                          <FormattedText text={sec.content} className="text-slate-600 text-sm" />
                         </div>
                       ))}
                     </div>
@@ -488,40 +548,75 @@ export function ProductDetail() {
                 </div>
               )}
 
+
               {/* TAB 2: SPECIFICATIONS */}
               {activeTab === 'specifications' && (
                 <div className="space-y-6">
-                  {specSections.length > 0 ? (
-                    <div className="space-y-6">
+                  {/* Standard 10 Product Specification Pill Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    {[
+                      { key: 'outputPower', label: 'OUTPUT POWER', defaultVal: 'Standard' },
+                      { key: 'dimensions', label: 'DIMENSIONS', defaultVal: 'Standard' },
+                      { key: 'size', label: 'SIZE', defaultVal: 'Standard' },
+                      { key: 'warranty', label: 'WARRANTY', defaultVal: 'Standard' },
+                      { key: 'compatibility', label: 'COMPATIBILITY', defaultVal: 'Standard' },
+                      { key: 'cableLength', label: 'CABLE LENGTH', defaultVal: 'Standard' },
+                      { key: 'height', label: 'HEIGHT', defaultVal: 'Standard' },
+                      { key: 'width', label: 'WIDTH', defaultVal: 'Standard' },
+                      { key: 'color', label: 'COLOR', defaultVal: 'Deep Teal' },
+                      { key: 'material', label: 'MATERIAL', defaultVal: 'Standard' },
+                    ].map((spec) => {
+                      const customValue = product?.specs?.[spec.key];
+                      const displayVal = customValue && customValue.trim() !== '' ? customValue : spec.defaultVal;
+
+                      return (
+                        <div
+                          key={spec.key}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-5 py-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-wagh-teal/30 transition-all gap-1.5 sm:gap-4"
+                        >
+                          <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px] sm:text-[11px] font-mono-tag shrink-0">
+                            {spec.label}
+                          </span>
+                          <span className="font-bold text-slate-800 text-xs sm:text-sm font-mono-tag text-left sm:text-right break-words flex-1">
+                            {displayVal}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Custom Structured Specification Tables (If Added) */}
+                  {specSections.length > 0 && (
+                    <div className="space-y-6 pt-4 border-t border-slate-100">
                       {specSections.map((section, sIdx) => (
                         <div key={sIdx} className="space-y-3">
                           <h4 className="font-editorial text-lg font-bold text-wagh-dark flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-wagh-teal"></span>
-                            <span>{section?.title || 'Specifications'}</span>
+                            <span>{section?.title || 'Additional Specifications'}</span>
                           </h4>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {section?.items?.filter(Boolean).map((item, iIdx) => (
-                              <div key={iIdx} className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-                                <span className="font-mono-tag uppercase text-wagh-muted font-bold">{item?.label || 'Spec'}</span>
-                                <span className="font-bold text-wagh-dark">{item?.value || 'Details'}</span>
+                              <div
+                                key={iIdx}
+                                className="flex flex-col sm:flex-row sm:items-center justify-between px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 gap-1.5 sm:gap-4"
+                              >
+                                <span className="font-mono-tag uppercase text-wagh-muted font-bold text-[10px] sm:text-[11px] shrink-0">
+                                  {item?.label || 'Spec'}
+                                </span>
+                                <span className="font-bold text-wagh-dark text-xs sm:text-sm font-mono-tag text-left sm:text-right break-words">
+                                  {item?.value || 'Details'}
+                                </span>
                               </div>
                             ))}
                           </div>
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {Object.entries(product?.specs || {}).map(([key, val]) => (
-                        <div key={key} className="flex items-center justify-between p-3.5 rounded-xl bg-gray-50 border border-wagh-border text-xs">
-                          <span className="font-mono-tag uppercase text-wagh-muted">{key.replace(/([A-Z])/g, ' $1')}</span>
-                          <span className="font-bold text-wagh-dark">{val || 'Standard'}</span>
-                        </div>
-                      ))}
-                    </div>
                   )}
+
                 </div>
               )}
+
 
               {/* TAB 3: KEY FEATURES */}
               {activeTab === 'features' && (
@@ -530,37 +625,39 @@ export function ProductDetail() {
                     <div className="space-y-6">
                       {featureSections.map((section, sIdx) => (
                         <div key={sIdx} className="space-y-3">
-                          <h4 className="font-editorial text-lg font-bold text-wagh-dark flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-wagh-teal"></span>
-                            <span>{section?.title || 'Key Features & Benefits'}</span>
+                          <h4 className="font-editorial text-xl font-bold text-slate-900 mb-3">
+                            {section?.title || 'Product Highlights'}
                           </h4>
-                          <div className="space-y-2.5 pl-1">
-                            {section?.items?.filter(Boolean).map((item, iIdx) => (
-                              <div key={iIdx} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs sm:text-sm">
-                                <CheckCircle className="w-4 h-4 text-wagh-teal shrink-0 mt-0.5" />
-                                <div>
-                                  <strong className="text-wagh-dark font-bold">{item?.label || 'Feature'}: </strong>
-                                  <span className="text-slate-600 font-sans">{item?.value || ''}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                          <ul className="space-y-3 pl-1">
+                            {section?.items?.filter(Boolean).map((item, iIdx) => {
+                              const itemText = item.value
+                                ? item.label && item.label.toLowerCase() !== 'feature' && item.label.toLowerCase() !== 'spec'
+                                  ? `${item.label}: ${item.value}`
+                                  : item.value
+                                : item.label;
+
+                              return (
+                                <li
+                                  key={iIdx}
+                                  className="flex items-start gap-3 text-slate-600 text-sm sm:text-base leading-relaxed font-sans"
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0 mt-2.5" />
+                                  <span className="flex-1 break-words">{itemText}</span>
+                                </li>
+                              );
+                            })}
+                          </ul>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <h4 className="font-editorial text-lg font-bold text-wagh-dark mb-2">Product Highlights</h4>
-                      <ul className="list-disc pl-5 space-y-2 text-sm text-wagh-dark/80 font-sans">
-                        <li>Super fast PPS 45W charging output compatible with Samsung SFC 2.0.</li>
-                        <li>Aerospace-grade thermal heat management reduces heating by 35%.</li>
-                        <li>10-layer smart safety protection system certified by BIS standards.</li>
-                        <li>Compact travel-friendly dimensions with durable metallic accents.</li>
-                      </ul>
+                      <FormattedText text={product.description} title="Product Highlights" />
                     </div>
                   )}
                 </div>
               )}
+
 
               {/* TAB 4: REVIEWS */}
               {activeTab === 'reviews' && (
