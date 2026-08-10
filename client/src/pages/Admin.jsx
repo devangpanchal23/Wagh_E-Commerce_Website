@@ -527,7 +527,7 @@ export function Admin() {
         description: productForm.description,
         price: Number(productForm.price),
         mrp: Number(productForm.mrp),
-        category: productForm.category || categories[0]?._id,
+        category: productForm.category || categories[0]?._id || '',
         brand: productForm.brand,
         stock: Number(productForm.stock),
         images: productForm.images.length > 0 ? productForm.images : ['https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600'],
@@ -1166,9 +1166,9 @@ export function Admin() {
               {/* TAB 1: BASIC INFO & PRICING */}
               {modalTab === 'basic' && (
                 <div className="space-y-4 animate-fade-in">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-slate-700 mb-1 font-semibold">Product Name</label>
+                      <label className="block text-slate-700 mb-1 font-semibold">Product Name *</label>
                       <input
                         type="text"
                         required
@@ -1176,6 +1176,25 @@ export function Admin() {
                         onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
                         className="w-full p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-wagh-teal"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-slate-700 mb-1 font-semibold">Category *</label>
+                      <select
+                        required
+                        value={productForm.category || categories[0]?._id || ''}
+                        onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                        className="w-full p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-wagh-teal font-sans text-xs bg-white"
+                      >
+                        {categories.length === 0 ? (
+                          <option value="">Default / General</option>
+                        ) : (
+                          categories.map((cat) => (
+                            <option key={cat._id} value={cat._id}>
+                              {cat.name}
+                            </option>
+                          ))
+                        )}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-slate-700 mb-1 font-semibold">Brand</label>

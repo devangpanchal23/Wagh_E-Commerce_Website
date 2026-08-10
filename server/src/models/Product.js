@@ -104,15 +104,22 @@ const productSchema = new mongoose.Schema({
 
 productSchema.index({ name: 'text', description: 'text', brand: 'text' });
 
-// Auto-generate slug from name if not explicitly provided
-productSchema.pre('validate', function(next) {
-  if (this.name && !this.slug) {
-    this.slug = this.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)+/g, '');
+// Auto-generate slug and resolve category before validation
+productSchema.pre('validate', async function(next) {
+  try {
+    if (this.name && !this.slug) {
+      this.slug = this.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '');
+    }
+
+    const { resolveCategoryId } = require('../utils/categoryResolver');
+    this.category = await resolveCategoryId(this.category);
+    next();
+  } catch (err) {
+    next(err);
   }
-  next();
 });
 
 module.exports = mongoose.model('Product', productSchema);

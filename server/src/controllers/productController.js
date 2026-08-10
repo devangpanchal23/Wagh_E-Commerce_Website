@@ -1,5 +1,6 @@
 const Product = require('../models/Product');
 const Category = require('../models/Category');
+const { resolveCategoryId } = require('../utils/categoryResolver');
 
 // @desc    Get products with search, filter, sort & pagination
 // @route   GET /api/v1/products
@@ -129,6 +130,7 @@ exports.createProduct = async (req, res, next) => {
   try {
     const { name, description, price, mrp, images, category, brand, specs, stock, isFeatured, isNewArrival, isBestSeller } = req.body;
     
+    const resolvedCategory = await resolveCategoryId(category);
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Date.now();
 
     const product = await Product.create({
@@ -138,7 +140,7 @@ exports.createProduct = async (req, res, next) => {
       price,
       mrp,
       images: images && images.length > 0 ? images : ['https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=600&auto=format&fit=crop'],
-      category,
+      category: resolvedCategory,
       brand: brand || 'WAGH',
       specs: specs || {},
       stock: stock || 100,
@@ -167,6 +169,10 @@ exports.updateProduct = async (req, res, next) => {
     }
 
     Object.assign(product, req.body);
+    if (req.body.category || !product.category) {
+      product.category = await resolveCategoryId(req.body.category);
+    }
+
     if (req.body.name) {
       product.slug = req.body.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     }

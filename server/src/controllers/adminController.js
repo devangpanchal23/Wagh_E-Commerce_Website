@@ -4,6 +4,7 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const User = require('../models/User');
 const Category = require('../models/Category');
+const { resolveCategoryId } = require('../utils/categoryResolver');
 
 // @desc    Admin authentication with username & password
 // @route   POST /api/v1/admin/login
@@ -242,6 +243,7 @@ exports.createAdminProduct = async (req, res, next) => {
     if (req.body.sections) {
       req.body.sections = sanitizeSections(req.body.sections);
     }
+    req.body.category = await resolveCategoryId(req.body.category);
     const product = await Product.create(req.body);
     res.status(201).json({
       success: true,
@@ -264,6 +266,10 @@ exports.updateAdminProduct = async (req, res, next) => {
 
     if (req.body.sections) {
       req.body.sections = sanitizeSections(req.body.sections);
+    }
+
+    if (req.body.category || !product.category) {
+      req.body.category = await resolveCategoryId(req.body.category);
     }
 
     product = await Product.findByIdAndUpdate(req.params.id, req.body, {
