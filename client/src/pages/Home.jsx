@@ -86,9 +86,9 @@ export function Home() {
           </div>
 
           {/* Right Hero Image Card */}
-          <div className="lg:col-span-5 relative">
+          <div className="lg:col-span-5 relative w-full">
             <div className="absolute -inset-4 bg-gradient-to-r from-wagh-teal to-wagh-gold rounded-3xl opacity-20 blur-2xl transform -rotate-3" />
-            <div className="relative bg-white rounded-3xl p-6 sm:p-8 border border-wagh-border shadow-2xl space-y-6">
+            <div className="relative bg-white rounded-3xl p-5 sm:p-6 lg:p-8 border border-wagh-border shadow-2xl space-y-5 sm:space-y-6">
               
               {/* Product Badge */}
               <div className="flex items-center justify-between">
@@ -100,33 +100,34 @@ export function Home() {
                 </span>
               </div>
 
-              {/* Main Image */}
-              <div className="aspect-square bg-gray-50 rounded-2xl overflow-hidden p-6 flex items-center justify-center">
+              {/* Responsive Hero Banner Image Container */}
+              <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-slate-900 border border-slate-200/80 shadow-md group">
                 <img
-                  src="https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=800&auto=format&fit=crop&q=80"
-                  alt="WAGH Super Fast Charger 2.0 45W"
-                  className="w-full h-full object-contain hover:scale-105 transition-transform duration-500"
+                  src="/assets/branding/wagh-100w-launch-banner.png"
+                  alt="WAGH 100W Fast Charger New Launch Banner"
+                  className="w-full h-full object-cover sm:object-contain group-hover:scale-105 transition-transform duration-500 rounded-2xl"
                 />
               </div>
 
               <div className="space-y-2">
-                <h3 className="font-editorial text-2xl font-bold text-wagh-dark">
-                  WAGH Super Fast Charger 2.0 (45W)
+                <h3 className="font-editorial text-xl sm:text-2xl font-bold text-wagh-dark">
+                  WAGH 100W Super Fast Charger 2.0
                 </h3>
                 <p className="text-xs text-wagh-muted font-sans">
-                  Includes 1.2m Braided Type-C to Type-C 100W E-Marker Cable in box.
+                  Engineered with 100W Supported Fast Charging & Braided Type-C Cable.
                 </p>
               </div>
 
               <Link
-                to="/product/wagh-super-fast-charger-45w"
-                className="w-full py-3 rounded-full bg-wagh-teal text-white font-bold text-sm hover:bg-wagh-teal-dark transition-colors flex items-center justify-center gap-2 shadow-md"
+                to="/shop?category=chargers-adapters"
+                className="w-full py-3.5 rounded-full bg-wagh-teal hover:bg-wagh-teal-dark text-white font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg cursor-pointer"
               >
-                <span>Buy 45W Adapter Now</span>
+                <span>Buy 100W Adapter Now</span>
                 <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
           </div>
+
         </div>
       </section>
 

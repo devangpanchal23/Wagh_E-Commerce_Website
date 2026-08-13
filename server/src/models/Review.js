@@ -33,4 +33,10 @@ const reviewSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+// Product detail page: fetch a product's reviews newest-first
+reviewSchema.index({ product: 1, createdAt: -1 });
+
+// "Has this user already reviewed this product?" guard — unique also prevents duplicates
+reviewSchema.index({ product: 1, user: 1 }, { unique: true });
+
 module.exports = mongoose.model('Review', reviewSchema);

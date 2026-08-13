@@ -64,8 +64,12 @@ const userSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+// `email` is already indexed by its `unique: true` declaration — redeclaring it
+// here would build a duplicate index and trigger a Mongoose warning on boot.
 userSchema.index({ clerkId: 1 }, { sparse: true });
-userSchema.index({ email: 1 });
+
+// Admin dashboard customer count
+userSchema.index({ role: 1 });
 
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();

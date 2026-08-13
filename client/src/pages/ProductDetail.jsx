@@ -14,7 +14,15 @@ import { useToast } from '../context/ToastContext';
 function FormattedText({ text, title = null, className = '' }) {
   if (!text) return null;
 
-  const rawLines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  const rawLines = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(
+      (l) =>
+        Boolean(l) &&
+        !['product details', 'product detail', 'product specifications', 'details'].includes(l.toLowerCase())
+    );
+
   if (rawLines.length === 0) return null;
 
   return (
@@ -41,6 +49,47 @@ function FormattedText({ text, title = null, className = '' }) {
       </ul>
     </div>
   );
+}
+
+// Helper function to extract only specs added by admin (no hardcoded fallbacks)
+function getValidAdminSpecs(product) {
+  if (!product?.specs || typeof product.specs !== 'object') return [];
+
+  const specLabelMap = {
+    outputPower: 'OUTPUT POWER',
+    dimensions: 'SIZE & DIMENSIONS',
+    size: 'SIZE',
+    warranty: 'WARRANTY',
+    compatibility: 'COMPATIBILITY',
+    cableLength: 'CABLE LENGTH',
+    height: 'HEIGHT',
+    width: 'WIDTH',
+    color: 'COLOR',
+    material: 'MATERIAL',
+  };
+
+  const valid = [];
+  const keys = Object.keys(product.specs);
+
+  for (const key of keys) {
+    const rawVal = product.specs[key];
+    if (typeof rawVal === 'string' && rawVal.trim() !== '') {
+      const val = rawVal.trim();
+      // Skip redundant size if dimensions is already present
+      if (key === 'size' && product.specs.dimensions && product.specs.dimensions.trim() !== '') {
+        continue;
+      }
+      const label = specLabelMap[key] || key.replace(/([A-Z])/g, ' $1').toUpperCase();
+      valid.push({
+        key,
+        label,
+        value: val,
+        isLong: val.length > 40 || val.includes('\n'),
+      });
+    }
+  }
+
+  return valid;
 }
 
 
@@ -383,32 +432,81 @@ export function ProductDetail() {
             </span>
           </div>
 
-          {/* Quick Spec Highlights */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-[#0f4b3f]/30 transition-all flex flex-col justify-between">
-              <span className="font-mono-tag text-slate-400 block text-[10px] font-bold uppercase tracking-wider mb-1">OUTPUT POWER</span>
-              <span className="font-mono-tag font-bold text-[#0f4b3f] text-xs sm:text-sm leading-snug break-words">
-                {product.specs?.outputPower || '45W PPS Super Fast'}
-              </span>
-            </div>
-            
-            <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-[#0f4b3f]/30 transition-all flex flex-col justify-between">
-              <span className="font-mono-tag text-slate-400 block text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
-                <Ruler className="w-3 h-3 text-[#0f4b3f] shrink-0" />
-                <span>SIZE & DIMENSIONS</span>
-              </span>
-              <span className="font-mono-tag font-bold text-[#0f4b3f] text-xs sm:text-sm leading-snug break-words">
-                {product.specs?.dimensions || product.specs?.size || (product.specs?.height && product.specs?.width ? `${product.specs.height} × ${product.specs.width}` : '12.5 × 6.5 cm')}
-              </span>
-            </div>
+          {/* Quick Spec Highlights (Adaptive Layout: Short badges side-by-side, Long content full width) */}
+          {(() => {
+            const validSpecs = getValidAdminSpecs(product);
+            if (validSpecs.length === 0) return null;
 
-            <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-[#0f4b3f]/30 transition-all flex flex-col justify-between">
-              <span className="font-mono-tag text-slate-400 block text-[10px] font-bold uppercase tracking-wider mb-1">WARRANTY</span>
-              <span className="font-mono-tag font-bold text-[#0f4b3f] text-xs sm:text-sm leading-snug break-words">
-                {product.specs?.warranty || '24 Months Replacement'}
-              </span>
-            </div>
-          </div>
+            const shortSpecs = validSpecs.filter((s) => !s.isLong);
+            const longSpecs = validSpecs.filter((s) => s.isLong);
+
+            return (
+              <div className="space-y-3 pt-1">
+                {/* Short specs in adaptive flex/grid with compact items-start height */}
+                {shortSpecs.length > 0 && (
+                  <div
+                    className={`grid gap-3 items-start ${
+                      shortSpecs.length === 1
+                        ? 'grid-cols-1'
+                        : shortSpecs.length === 2
+                        ? 'grid-cols-1 sm:grid-cols-2'
+                        : 'grid-cols-1 sm:grid-cols-3'
+                    }`}
+                  >
+                    {shortSpecs.map((spec) => {
+                      const isDimension = spec.key.toLowerCase().includes('dimension') || spec.key.toLowerCase().includes('size');
+                      const isWarranty = spec.key.toLowerCase().includes('warranty');
+
+                      return (
+                        <div
+                          key={spec.key}
+                          className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-[#0f4b3f]/30 transition-all flex flex-col justify-center h-auto min-h-[74px]"
+                        >
+                          <span className="font-mono-tag text-slate-400 block text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                            {isDimension ? (
+                              <Ruler className="w-3 h-3 text-[#0f4b3f] shrink-0" />
+                            ) : isWarranty ? (
+                              <ShieldCheck className="w-3 h-3 text-[#0f4b3f] shrink-0" />
+                            ) : (
+                              <Zap className="w-3 h-3 text-[#0f4b3f] shrink-0" />
+                            )}
+                            <span>{spec.label}</span>
+                          </span>
+                          <span className="font-mono-tag font-bold text-[#0f4b3f] text-xs sm:text-sm leading-snug break-words">
+                            {spec.value}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Long specs span full-width underneath cleanly without stretching short cards */}
+                {longSpecs.map((spec) => {
+                  const isWarranty = spec.key.toLowerCase().includes('warranty');
+
+                  return (
+                    <div
+                      key={spec.key}
+                      className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200/80 shadow-2xs hover:border-[#0f4b3f]/30 transition-all space-y-1.5"
+                    >
+                      <span className="font-mono-tag text-slate-500 block text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        {isWarranty ? (
+                          <ShieldCheck className="w-3.5 h-3.5 text-[#0f4b3f] shrink-0" />
+                        ) : (
+                          <Zap className="w-3.5 h-3.5 text-[#0f4b3f] shrink-0" />
+                        )}
+                        <span>{spec.label}</span>
+                      </span>
+                      <p className="font-mono-tag font-semibold text-slate-800 text-xs sm:text-sm leading-relaxed break-words">
+                        {spec.value}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Quantity Stepper & Wishlist */}
           <div className="flex items-center gap-4 pt-1">
@@ -535,14 +633,18 @@ export function ProductDetail() {
                 <div className="space-y-6 text-wagh-dark text-sm sm:text-base leading-relaxed">
                   <FormattedText text={product.description} />
                   
-                  {textOverviewSections.length > 0 && (
+                  {textOverviewSections.filter((sec) => sec && sec.content && sec.content.trim() !== '').length > 0 && (
                     <div className="space-y-4 pt-4 border-t border-slate-100">
-                      {textOverviewSections.map((sec, sIdx) => (
-                        <div key={sIdx} className="space-y-2">
-                          <h4 className="font-editorial text-lg font-bold text-wagh-dark">{sec.title}</h4>
-                          <FormattedText text={sec.content} className="text-slate-600 text-sm" />
-                        </div>
-                      ))}
+                      {textOverviewSections
+                        .filter((sec) => sec && sec.content && sec.content.trim() !== '')
+                        .map((sec, sIdx) => (
+                          <div key={sIdx} className="space-y-2">
+                            {sec.title && sec.title.trim() !== '' && (
+                              <h4 className="font-editorial text-lg font-bold text-wagh-dark">{sec.title}</h4>
+                            )}
+                            <FormattedText text={sec.content} className="text-slate-600 text-sm" />
+                          </div>
+                        ))}
                     </div>
                   )}
                 </div>
@@ -552,38 +654,36 @@ export function ProductDetail() {
               {/* TAB 2: SPECIFICATIONS */}
               {activeTab === 'specifications' && (
                 <div className="space-y-6">
-                  {/* Standard 10 Product Specification Pill Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                    {[
-                      { key: 'outputPower', label: 'OUTPUT POWER', defaultVal: 'Standard' },
-                      { key: 'dimensions', label: 'DIMENSIONS', defaultVal: 'Standard' },
-                      { key: 'size', label: 'SIZE', defaultVal: 'Standard' },
-                      { key: 'warranty', label: 'WARRANTY', defaultVal: 'Standard' },
-                      { key: 'compatibility', label: 'COMPATIBILITY', defaultVal: 'Standard' },
-                      { key: 'cableLength', label: 'CABLE LENGTH', defaultVal: 'Standard' },
-                      { key: 'height', label: 'HEIGHT', defaultVal: 'Standard' },
-                      { key: 'width', label: 'WIDTH', defaultVal: 'Standard' },
-                      { key: 'color', label: 'COLOR', defaultVal: 'Deep Teal' },
-                      { key: 'material', label: 'MATERIAL', defaultVal: 'Standard' },
-                    ].map((spec) => {
-                      const customValue = product?.specs?.[spec.key];
-                      const displayVal = customValue && customValue.trim() !== '' ? customValue : spec.defaultVal;
-
+                  {/* Dynamic Product Specifications (Only show specs added by admin) */}
+                  {(() => {
+                    const validSpecs = getValidAdminSpecs(product);
+                    if (validSpecs.length > 0) {
                       return (
-                        <div
-                          key={spec.key}
-                          className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-5 py-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-wagh-teal/30 transition-all gap-1.5 sm:gap-4"
-                        >
-                          <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px] sm:text-[11px] font-mono-tag shrink-0">
-                            {spec.label}
-                          </span>
-                          <span className="font-bold text-slate-800 text-xs sm:text-sm font-mono-tag text-left sm:text-right break-words flex-1">
-                            {displayVal}
-                          </span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                          {validSpecs.map((spec) => (
+                            <div
+                              key={spec.key}
+                              className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-5 py-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs hover:border-wagh-teal/30 transition-all gap-1.5 sm:gap-4"
+                            >
+                              <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px] sm:text-[11px] font-mono-tag shrink-0">
+                                {spec.label}
+                              </span>
+                              <span className="font-bold text-slate-800 text-xs sm:text-sm font-mono-tag text-left sm:text-right break-words flex-1">
+                                {spec.value}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       );
-                    })}
-                  </div>
+                    } else if (specSections.length === 0) {
+                      return (
+                        <div className="text-center py-8 px-4 rounded-2xl bg-slate-50 border border-slate-200/60 text-slate-500 font-mono-tag text-xs">
+                          No technical specifications listed for this product.
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
 
                   {/* Custom Structured Specification Tables (If Added) */}
                   {specSections.length > 0 && (

@@ -5,6 +5,7 @@ const Product = require('../models/Product');
 const User = require('../models/User');
 const Category = require('../models/Category');
 const { resolveCategoryId } = require('../utils/categoryResolver');
+const cache = require('../utils/cache');
 
 // @desc    Admin authentication with username & password
 // @route   POST /api/v1/admin/login
@@ -102,44 +103,79 @@ exports.verifyAdminSession = async (req, res) => {
 // @route   GET /api/v1/admin/stats
 exports.getAdminStats = async (req, res, next) => {
   try {
-    const totalOrders = await Order.countDocuments();
-    const totalProducts = await Product.countDocuments();
-    const totalCustomers = await User.countDocuments({ role: 'customer' });
-    const completedOrders = await Order.countDocuments({ orderStatus: { $in: ['Delivered', 'Completed'] } });
-
-    const allOrders = await Order.find();
-    const totalRevenue = allOrders.reduce((acc, item) => acc + (item.total || 0), 0);
-
     const now = new Date();
     const lastYear = now.getFullYear() - 1;
     const startOfLastYear = new Date(lastYear, 0, 1);
     const endOfLastYear = new Date(lastYear, 11, 31, 23, 59, 59);
 
-    const lastYearOrders = allOrders.filter((o) => {
-      const d = new Date(o.createdAt);
-      return d >= startOfLastYear && d <= endOfLastYear;
-    });
+    const COMPLETED_STATUSES = ['Delivered', 'Completed'];
 
-    const lastYearRevenue = lastYearOrders.reduce((acc, item) => acc + (item.total || 0), 0);
-    const lastYearCompletedOrders = lastYearOrders.filter(
-      (o) => o.orderStatus === 'Delivered' || o.orderStatus === 'Completed'
-    ).length;
+    // Revenue and per-status counts are computed by the database in a single
+    // aggregation pass. The previous version pulled every order document into
+    // Node just to sum `total`, which grew linearly with the order history.
+    const revenueAgg = Order.aggregate([
+      {
+        $facet: {
+          overall: [
+            {
+              $group: {
+                _id: null,
+                totalRevenue: { $sum: '$total' },
+                totalOrders: { $sum: 1 },
+                completedOrders: {
+                  $sum: { $cond: [{ $in: ['$orderStatus', COMPLETED_STATUSES] }, 1, 0] },
+                },
+                pendingOrders: {
+                  $sum: { $cond: [{ $eq: ['$orderStatus', 'Processing'] }, 1, 0] },
+                },
+              },
+            },
+          ],
+          lastYear: [
+            { $match: { createdAt: { $gte: startOfLastYear, $lte: endOfLastYear } } },
+            {
+              $group: {
+                _id: null,
+                lastYearRevenue: { $sum: '$total' },
+                lastYearTotalOrders: { $sum: 1 },
+                lastYearCompletedOrders: {
+                  $sum: { $cond: [{ $in: ['$orderStatus', COMPLETED_STATUSES] }, 1, 0] },
+                },
+              },
+            },
+          ],
+        },
+      },
+    ]);
 
-    const pendingOrders = await Order.countDocuments({ orderStatus: 'Processing' });
-    const recentOrders = await Order.find().populate('user', 'name email').sort({ createdAt: -1 }).limit(10);
+    // Independent queries — issued in parallel rather than one after another
+    const [aggResult, totalProducts, totalCustomers, recentOrders] = await Promise.all([
+      revenueAgg,
+      Product.estimatedDocumentCount(),
+      User.countDocuments({ role: 'customer' }),
+      Order.find()
+        .select('orderId user total orderStatus paymentStatus paymentMethod createdAt')
+        .populate('user', 'name email')
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean(),
+    ]);
+
+    const overall = aggResult[0]?.overall[0] || {};
+    const lastYearStats = aggResult[0]?.lastYear[0] || {};
 
     res.json({
       success: true,
       data: {
-        totalRevenue,
-        totalOrders,
+        totalRevenue: overall.totalRevenue || 0,
+        totalOrders: overall.totalOrders || 0,
         totalProducts,
         totalCustomers,
-        pendingOrders,
-        completedOrders,
-        lastYearRevenue,
-        lastYearTotalOrders: lastYearOrders.length,
-        lastYearCompletedOrders,
+        pendingOrders: overall.pendingOrders || 0,
+        completedOrders: overall.completedOrders || 0,
+        lastYearRevenue: lastYearStats.lastYearRevenue || 0,
+        lastYearTotalOrders: lastYearStats.lastYearTotalOrders || 0,
+        lastYearCompletedOrders: lastYearStats.lastYearCompletedOrders || 0,
         recentOrders,
       },
       message: 'Admin statistics retrieved successfully',
@@ -153,7 +189,14 @@ exports.getAdminStats = async (req, res, next) => {
 // @route   GET /api/v1/admin/orders
 exports.getAdminOrders = async (req, res, next) => {
   try {
-    const orders = await Order.find().populate('user', 'name email').sort({ createdAt: -1 });
+    // `.lean()` returns plain objects — no Mongoose document wrapper per order/item.
+    // Backed by the { createdAt: -1 } index so the sort no longer happens in memory.
+    const orders = await Order.find()
+      .populate('user', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .lean();
+
     res.json({
       success: true,
       data: orders,
@@ -199,7 +242,11 @@ exports.updateAdminOrderStatus = async (req, res, next) => {
 // @route   GET /api/v1/admin/products
 exports.getAdminProducts = async (req, res, next) => {
   try {
-    const products = await Product.find().populate('category').sort({ createdAt: -1 });
+    const products = await Product.find()
+      .populate('category', 'name slug icon')
+      .sort({ createdAt: -1 })
+      .lean();
+
     res.json({
       success: true,
       data: products,
@@ -245,6 +292,9 @@ exports.createAdminProduct = async (req, res, next) => {
     }
     req.body.category = await resolveCategoryId(req.body.category);
     const product = await Product.create(req.body);
+
+    cache.invalidate('products:', 'product:');
+
     res.status(201).json({
       success: true,
       data: product,
@@ -259,8 +309,10 @@ exports.createAdminProduct = async (req, res, next) => {
 // @route   PUT /api/v1/admin/products/:id
 exports.updateAdminProduct = async (req, res, next) => {
   try {
-    let product = await Product.findById(req.params.id);
-    if (!product) {
+    // Only the category field is needed for the existence check — fetch just that
+    // instead of hydrating the whole document (including its `sections` array).
+    const existing = await Product.findById(req.params.id).select('category').lean();
+    if (!existing) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
@@ -268,14 +320,16 @@ exports.updateAdminProduct = async (req, res, next) => {
       req.body.sections = sanitizeSections(req.body.sections);
     }
 
-    if (req.body.category || !product.category) {
+    if (req.body.category || !existing.category) {
       req.body.category = await resolveCategoryId(req.body.category);
     }
 
-    product = await Product.findByIdAndUpdate(req.params.id, req.body, {
+    const product = await Product.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true,
     });
+
+    cache.invalidate('products:', 'product:');
 
     res.json({
       success: true,
@@ -292,12 +346,13 @@ exports.updateAdminProduct = async (req, res, next) => {
 // @route   DELETE /api/v1/admin/products/:id
 exports.deleteAdminProduct = async (req, res, next) => {
   try {
-    const product = await Product.findById(req.params.id);
+    // Single round trip — findByIdAndDelete already reports whether it matched
+    const product = await Product.findByIdAndDelete(req.params.id).lean();
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
-    await Product.findByIdAndDelete(req.params.id);
+    cache.invalidate('products:', 'product:');
 
     res.json({
       success: true,
@@ -312,7 +367,7 @@ exports.deleteAdminProduct = async (req, res, next) => {
 // @route   GET /api/v1/admin/categories
 exports.getAdminCategories = async (req, res, next) => {
   try {
-    const categories = await Category.find();
+    const categories = await Category.find().sort({ name: 1 }).lean();
     res.json({
       success: true,
       data: categories,

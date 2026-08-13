@@ -104,6 +104,45 @@ const productSchema = new mongoose.Schema({
 
 productSchema.index({ name: 'text', description: 'text', brand: 'text' });
 
+// --- Query indexes -----------------------------------------------------------
+// Every index below backs a filter/sort combination the shop actually issues.
+// Without them each listing request is a full collection scan plus an in-memory sort.
+
+// Shop grid: filter by category, sort by newest (the default view)
+productSchema.index({ category: 1, createdAt: -1 });
+
+// Shop grid: filter by category, sort by price (both directions use this index)
+productSchema.index({ category: 1, price: 1 });
+
+// Price-range filters and the "max price" lookup for the range slider
+productSchema.index({ price: 1 });
+
+// Unfiltered listing sorted by newest
+productSchema.index({ createdAt: -1 });
+
+// Popularity sort
+productSchema.index({ ratingCount: -1, ratingAvg: -1 });
+
+// Brand facet
+productSchema.index({ brand: 1 });
+
+// Home page collections. These use partial filters rather than `sparse`: the flags
+// default to `false`, so every product would carry the field and a sparse index
+// would still cover the whole collection. A partial index stores only the products
+// actually in each collection — typically a handful of rows.
+productSchema.index(
+  { isFeatured: 1, createdAt: -1 },
+  { partialFilterExpression: { isFeatured: true } }
+);
+productSchema.index(
+  { isNewArrival: 1, createdAt: -1 },
+  { partialFilterExpression: { isNewArrival: true } }
+);
+productSchema.index(
+  { isBestSeller: 1, createdAt: -1 },
+  { partialFilterExpression: { isBestSeller: true } }
+);
+
 // Auto-generate slug and resolve category before validation
 productSchema.pre('validate', async function(next) {
   try {

@@ -6,6 +6,7 @@ const {
   getConnectionStatus,
   getAccessToken,
   disconnectGoogleDrive,
+  getGoogleDriveConfig,
 } = require('../controllers/googleDriveController');
 const { verifyAdminToken } = require('../middleware/adminAuth');
 
@@ -30,6 +31,7 @@ const tokenLimiter = rateLimit({
 // All routes require admin token authentication
 router.use(verifyAdminToken);
 
+router.get('/config', getGoogleDriveConfig);
 router.post('/connect', connectLimiter, connectGoogleDrive);
 router.get('/status', getConnectionStatus);
 router.get('/access-token', tokenLimiter, getAccessToken);

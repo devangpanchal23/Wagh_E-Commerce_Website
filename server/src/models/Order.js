@@ -55,6 +55,13 @@ const orderSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+// "My orders" page
 orderSchema.index({ user: 1, createdAt: -1 });
+
+// Admin orders table (all orders, newest first)
+orderSchema.index({ createdAt: -1 });
+
+// Admin dashboard status counts and status-filtered views
+orderSchema.index({ orderStatus: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Order', orderSchema);

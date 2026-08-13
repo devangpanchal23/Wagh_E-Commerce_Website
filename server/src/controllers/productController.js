@@ -1,14 +1,29 @@
 const Product = require('../models/Product');
 const Category = require('../models/Category');
 const { resolveCategoryId } = require('../utils/categoryResolver');
+const cache = require('../utils/cache');
+
+// Fields a product grid card actually renders. Skipping `sections` and `description`
+// keeps listing payloads small — those are only needed on the detail page.
+const LIST_PROJECTION =
+  'name slug price mrp images category brand stock ratingAvg ratingCount isFeatured isNewArrival isBestSeller createdAt';
 
 // @desc    Get products with search, filter, sort & pagination
 // @route   GET /api/v1/products
 exports.getProducts = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 12;
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    // Cap the page size so a crafted `?limit=100000` can't pull the whole catalog
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 12, 1), 60);
     const skip = (page - 1) * limit;
+
+    // Serve identical listing requests straight from memory (60s TTL)
+    const cacheKey = `products:${JSON.stringify(req.query)}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+      return res.json(cached);
+    }
 
     const query = {};
 
@@ -32,7 +47,7 @@ exports.getProducts = async (req, res, next) => {
           { slug: { $in: categories } },
           { name: { $in: categories.map(c => new RegExp(`^${c.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i')) } }
         ]
-      });
+      }).select('_id').lean();
 
       const matchedCategoryIds = Array.from(new Set([
         ...catObjs.map(c => c._id.toString()),
@@ -69,20 +84,28 @@ exports.getProducts = async (req, res, next) => {
     else if (req.query.sort === 'popularity') sort = { ratingCount: -1, ratingAvg: -1 };
     else if (req.query.sort === 'newest') sort = { createdAt: -1 };
 
-    const total = await Product.countDocuments(query);
-    const products = await Product.find(query)
-      .populate('category', 'name slug')
-      .sort(sort)
-      .skip(skip)
-      .limit(limit);
-
-    // Calculate maximum product price dynamically for the selected category/search
+    // Max price for the range slider, ignoring the price filter itself
     const maxPriceQuery = { ...query };
     delete maxPriceQuery.price;
-    const highestProduct = await Product.findOne(maxPriceQuery).sort({ price: -1 }).select('price').lean();
+
+    // These three queries are independent — run them on one round trip instead of
+    // three sequential ones. `.lean()` skips Mongoose document hydration, which is
+    // the bulk of the CPU cost on a listing response.
+    const [total, products, highestProduct] = await Promise.all([
+      Product.countDocuments(query),
+      Product.find(query)
+        .select(LIST_PROJECTION)
+        .populate('category', 'name slug')
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Product.findOne(maxPriceQuery).sort({ price: -1 }).select('price').lean(),
+    ]);
+
     const maxProductPrice = highestProduct ? Math.ceil(highestProduct.price) : 2000;
 
-    res.json({
+    const payload = {
       success: true,
       data: {
         products,
@@ -92,7 +115,11 @@ exports.getProducts = async (req, res, next) => {
         maxProductPrice,
       },
       message: 'Products fetched successfully'
-    });
+    };
+
+    cache.set(cacheKey, payload, 60);
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    res.json(payload);
   } catch (error) {
     next(error);
   }
@@ -103,22 +130,34 @@ exports.getProducts = async (req, res, next) => {
 exports.getProductById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    let product;
-    if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      product = await Product.findById(id).populate('category', 'name slug');
-    } else {
-      product = await Product.findOne({ slug: id }).populate('category', 'name slug');
+
+    const cacheKey = `product:${id}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+      return res.json(cached);
     }
+
+    // Both lookups hit a unique index (_id or slug); `.lean()` avoids hydrating
+    // the full document including its `sections` subdocument array.
+    const filter = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { slug: id };
+    const product = await Product.findOne(filter)
+      .populate('category', 'name slug')
+      .lean();
 
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
-    res.json({
+    const payload = {
       success: true,
       data: product,
       message: 'Product fetched successfully'
-    });
+    };
+
+    cache.set(cacheKey, payload, 60);
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    res.json(payload);
   } catch (error) {
     next(error);
   }
@@ -148,6 +187,8 @@ exports.createProduct = async (req, res, next) => {
       isNewArrival: !!isNewArrival,
       isBestSeller: !!isBestSeller,
     });
+
+    cache.invalidate('products:', 'product:');
 
     res.status(201).json({
       success: true,
@@ -179,6 +220,8 @@ exports.updateProduct = async (req, res, next) => {
 
     const updatedProduct = await product.save();
 
+    cache.invalidate('products:', 'product:');
+
     res.json({
       success: true,
       data: updatedProduct,
@@ -198,6 +241,8 @@ exports.deleteProduct = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
+    cache.invalidate('products:', 'product:');
+
     res.json({
       success: true,
       data: null,
@@ -212,11 +257,30 @@ exports.deleteProduct = async (req, res, next) => {
 // @route   GET /api/v1/products/collections/featured
 exports.getHomeCollections = async (req, res, next) => {
   try {
-    const bestSellers = await Product.find({ isBestSeller: true }).populate('category', 'name slug').limit(8);
-    const newArrivals = await Product.find({ isNewArrival: true }).populate('category', 'name slug').limit(8);
-    const featured = await Product.find({ isFeatured: true }).populate('category', 'name slug').limit(8);
+    // The home page is the single most requested endpoint — cache it for 5 minutes.
+    const cacheKey = 'products:collections:featured';
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+      return res.json(cached);
+    }
 
-    res.json({
+    const collection = (flag) =>
+      Product.find({ [flag]: true })
+        .select(LIST_PROJECTION)
+        .populate('category', 'name slug')
+        .sort({ createdAt: -1 })
+        .limit(8)
+        .lean();
+
+    // Three independent queries — one round trip instead of three sequential ones
+    const [bestSellers, newArrivals, featured] = await Promise.all([
+      collection('isBestSeller'),
+      collection('isNewArrival'),
+      collection('isFeatured'),
+    ]);
+
+    const payload = {
       success: true,
       data: {
         bestSellers,
@@ -224,7 +288,11 @@ exports.getHomeCollections = async (req, res, next) => {
         featured,
       },
       message: 'Home collections fetched successfully'
-    });
+    };
+
+    cache.set(cacheKey, payload, 300);
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+    res.json(payload);
   } catch (error) {
     next(error);
   }

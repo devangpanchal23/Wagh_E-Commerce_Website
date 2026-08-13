@@ -55,7 +55,7 @@ exports.getMyOrders = async (req, res, next) => {
 
 exports.getOrderById = async (req, res, next) => {
   try {
-    const order = await Order.findById(req.params.id);
+    const order = await Order.findById(req.params.id).lean();
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
@@ -75,7 +75,12 @@ exports.getOrderById = async (req, res, next) => {
 // Admin: Get all orders
 exports.getAllOrders = async (req, res, next) => {
   try {
-    const orders = await Order.find().populate('user', 'name email').sort({ createdAt: -1 });
+    const orders = await Order.find()
+      .populate('user', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .lean();
+
     res.json({
       success: true,
       data: orders,

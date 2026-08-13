@@ -1,9 +1,17 @@
 const Review = require('../models/Review');
 const Product = require('../models/Product');
+const cache = require('../utils/cache');
 
 exports.getProductReviews = async (req, res, next) => {
   try {
-    const reviews = await Review.find({ product: req.params.productId }).sort({ createdAt: -1 });
+    // Served by the { product: 1, createdAt: -1 } index — no in-memory sort
+    const reviews = await Review.find({ product: req.params.productId })
+      .select('userName rating comment verifiedPurchase createdAt')
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     res.json({
       success: true,
       data: reviews,
@@ -32,14 +40,20 @@ exports.addReview = async (req, res, next) => {
       comment,
     });
 
-    // Update product rating metrics
-    const reviews = await Review.find({ product: productId });
-    const avg = reviews.reduce((acc, item) => item.rating + acc, 0) / reviews.length;
+    // Let the database compute the new average instead of loading every review
+    // document into Node just to sum a single field.
+    const [stats] = await Review.aggregate([
+      { $match: { product: review.product } },
+      { $group: { _id: null, avg: { $avg: '$rating' }, count: { $sum: 1 } } },
+    ]);
 
     await Product.findByIdAndUpdate(productId, {
-      ratingAvg: Math.round(avg * 10) / 10,
-      ratingCount: reviews.length,
+      ratingAvg: Math.round((stats?.avg || Number(rating)) * 10) / 10,
+      ratingCount: stats?.count || 1,
     });
+
+    // The product's cached rating is now stale
+    cache.invalidate('products:', 'product:');
 
     res.status(201).json({
       success: true,

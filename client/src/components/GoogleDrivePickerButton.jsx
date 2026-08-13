@@ -52,10 +52,17 @@ export function GoogleDrivePickerButton({ onFileSelected, isActive, onClickTab, 
   const [loading, setLoading] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [driveConnection, setDriveConnection] = useState({ connected: false, email: '' });
-  const { addToast } = useToast();
-
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+  const fetchGoogleConfig = async () => {
+    try {
+      const res = await fetchAdminApi('/admin/google-drive/config');
+      if (res && res.success) {
+        return { clientId: res.clientId || '', apiKey: res.apiKey || '' };
+      }
+    } catch (err) {
+      console.error('Failed to fetch Google Drive config from server:', err);
+    }
+    return { clientId: '', apiKey: '' };
+  };
 
   // Try to inspect Clerk user if available
   let clerkGoogleEmail = '';
@@ -97,15 +104,16 @@ export function GoogleDrivePickerButton({ onFileSelected, isActive, onClickTab, 
 
   // Initiate OAuth flow to connect user's Google Drive account
   const handleConnectAccount = async () => {
-    if (!clientId || clientId.includes('YOUR_GOOGLE_CLIENT_ID')) {
-      addToast('VITE_GOOGLE_CLIENT_ID missing or unconfigured in client/.env.', 'error');
-      return;
-    }
-
-
     setLoading(true);
 
     try {
+      const { clientId } = await fetchGoogleConfig();
+      if (!clientId) {
+        addToast('Google Client ID is not configured on server.', 'error');
+        setLoading(false);
+        return;
+      }
+
       await loadGoogleScripts();
 
       const codeClient = window.google.accounts.oauth2.initCodeClient({
@@ -113,6 +121,7 @@ export function GoogleDrivePickerButton({ onFileSelected, isActive, onClickTab, 
         scope: 'https://www.googleapis.com/auth/drive.readonly',
         ux_mode: 'popup',
         callback: async (response) => {
+
           if (response.error) {
             console.error('Google OAuth code error:', response);
             if (response.error === 'access_denied' || response.error === 'popup_closed_by_user') {
@@ -196,12 +205,14 @@ export function GoogleDrivePickerButton({ onFileSelected, isActive, onClickTab, 
     }
   };
 
-  const openPicker = (accessToken) => {
+  const openPicker = async (accessToken) => {
     if (!window.gapi) {
       addToast('Google API loader not available', 'error');
       setLoading(false);
       return;
     }
+
+    const { apiKey } = await fetchGoogleConfig();
 
     window.gapi.load('picker', {
       callback: () => {
@@ -211,10 +222,16 @@ export function GoogleDrivePickerButton({ onFileSelected, isActive, onClickTab, 
             .setSelectFolderEnabled(false);
 
           const builder = new window.google.picker.PickerBuilder()
-            .setOAuthToken(accessToken)
-            .setDeveloperKey(apiKey)
+            .setOAuthToken(accessToken);
+
+          if (apiKey) {
+            builder.setDeveloperKey(apiKey);
+          }
+
+          builder
             .addView(docsView)
             .setCallback(async (data) => {
+
               if (data.action === window.google.picker.Action.PICKED) {
                 const doc = data.docs?.[0];
                 if (doc) {

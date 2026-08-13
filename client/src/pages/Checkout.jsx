@@ -92,7 +92,11 @@ export function Checkout() {
           throw new Error('Failed to create Razorpay payment order');
         }
 
-        const razorpayKey = razorpayOrderRes.key || import.meta.env.VITE_RAZORPAY_KEY_ID;
+        const razorpayKey = razorpayOrderRes.key;
+        if (!razorpayKey) {
+          throw new Error('Razorpay Key ID is not configured on server');
+        }
+
 
         // Step 2: Open Razorpay Checkout Modal
         const options = {

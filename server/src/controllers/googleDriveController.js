@@ -233,3 +233,17 @@ exports.disconnectGoogleDrive = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Get Google Drive client configuration (Client ID & API Key) for admin
+// @route   GET /api/v1/admin/google-drive/config
+exports.getGoogleDriveConfig = async (req, res, next) => {
+  try {
+    return res.status(200).json({
+      success: true,
+      clientId: process.env.GOOGLE_CLIENT_ID || '',
+      apiKey: process.env.GOOGLE_API_KEY || '',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
