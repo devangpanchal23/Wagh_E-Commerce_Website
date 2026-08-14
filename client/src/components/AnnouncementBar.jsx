@@ -3,7 +3,7 @@ import { Zap, Truck, ShieldCheck } from 'lucide-react';
 
 export default function AnnouncementBar() {
   return (
-    <div className="bg-wagh-teal text-white py-2 px-4 text-xs md:text-sm font-medium tracking-wide border-b border-wagh-teal-light/30">
+    <div className="bg-wagh-teal text-white py-2 px-4 text-xs md:text-sm font-medium tracking-wide border-b border-wagh-teal-light/30 print:hidden no-print">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <div className="hidden sm:flex items-center gap-2 text-wagh-gold">
           <Truck className="w-4 h-4" />

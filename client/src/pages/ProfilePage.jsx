@@ -92,7 +92,7 @@ export function ProfilePage() {
 
   // Handler to save updated address array
   const handleSaveAddresses = async (newAddresses) => {
-    if (!user || !user.uid) return { success: false, message: 'Not authenticated' };
+    if (!user) return { success: false, message: 'Not authenticated' };
 
     const previousAddresses = profile?.addresses || [];
     setProfile((prev) => ({ ...prev, addresses: newAddresses }));

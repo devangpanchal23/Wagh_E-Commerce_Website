@@ -60,6 +60,17 @@ const userSchema = new mongoose.Schema({
     phone: String,
     isDefault: { type: Boolean, default: false }
   }],
+  savedAddress: {
+    fullName: { type: String, default: '' },
+    mobileNumber: { type: String, default: '' },
+    line1: { type: String, default: '' },
+    line2: { type: String, default: '' },
+    street: { type: String, default: '' },
+    city: { type: String, default: '' },
+    state: { type: String, default: '' },
+    pincode: { type: String, default: '' },
+    updatedAt: { type: Date, default: Date.now }
+  },
 }, {
   timestamps: true,
 });

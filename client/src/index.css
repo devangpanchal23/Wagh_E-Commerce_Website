@@ -121,4 +121,55 @@ div[style*="Double-click"] {
   display: none !important;
 }
 
+/* STRICT MEDIA PRINT STYLES FOR PERFECT 2-PAGE INVOICE & RECEIPT PDF PRINTING */
+@media print {
+  /* Hide all non-printable website layout elements */
+  nav,
+  footer,
+  header,
+  aside,
+  button,
+  .no-print,
+  .print-controls,
+  iframe,
+  .glass-nav,
+  [role="dialog"] {
+    display: none !important;
+  }
+
+  body,
+  #root,
+  main {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    box-shadow: none !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 8mm 12mm;
+  }
+
+  .print-page-1 {
+    page-break-after: always !important;
+    break-after: page !important;
+    display: block !important;
+  }
+
+  .print-page-2 {
+    page-break-before: always !important;
+    break-before: page !important;
+    display: block !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+
 

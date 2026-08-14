@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ShoppingBag, ShieldCheck, CreditCard, CheckCircle2, AlertCircle, ArrowLeft, Lock, Receipt, FileText, Truck } from 'lucide-react';
+import { ShoppingBag, ShieldCheck, CreditCard, CheckCircle2, AlertCircle, ArrowLeft, Lock, Receipt, FileText, Truck, Zap, MapPin, Save } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -15,16 +15,122 @@ export function Checkout() {
 
   const [address, setAddress] = useState({
     name: user?.name || '',
-    phone: '+91 90544 05305',
-    street: '42 Speed Avenue, Sector 4',
-    city: 'Mumbai',
-    state: 'Maharashtra',
-    pincode: '400001',
+    phone: '',
+    line1: '',
+    line2: '',
+    street: '',
+    city: '',
+    state: '',
+    pincode: '',
   });
+
+  const [savedAddrData, setSavedAddrData] = useState(null);
+  const [savedAddressesList, setSavedAddressesList] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const [showSavedAddrModal, setShowSavedAddrModal] = useState(false);
+  const [usedSavedAddr, setUsedSavedAddr] = useState(false);
+  const [showSaveAddrPrompt, setShowSaveAddrPrompt] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
 
   const [paymentMethod, setPaymentMethod] = useState('COD'); // COD | Razorpay
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
+
+  // Fetch saved addresses on mount if user is logged in
+  useEffect(() => {
+    if (!user) return; // Skip fetch for unauthenticated / guest users
+
+    const fetchSavedAddress = async () => {
+      try {
+        const res = await fetchApi('/auth/saved-address');
+        if (res && res.success && res.exists) {
+          const list = res.addresses && res.addresses.length > 0 ? res.addresses : (res.savedAddress ? [res.savedAddress] : []);
+          setSavedAddressesList(list);
+          setSavedAddrData(list[0] || null);
+          setShowSavedAddrModal(false);
+        }
+      } catch (err) {
+        // Fail silently to empty form state
+        console.warn('Saved address fetch failed silently:', err?.message);
+      }
+    };
+
+    fetchSavedAddress();
+  }, [user]);
+
+  const handleSelectAddress = (item) => {
+    if (!item) return;
+    const l1 = item.line1 || item.street || '';
+    const l2 = item.line2 || '';
+    const fullStreet = l2 ? `${l1}, ${l2}` : l1;
+
+    setAddress({
+      name: item.fullName || user?.name || '',
+      phone: item.mobileNumber || '',
+      line1: l1,
+      line2: l2,
+      street: fullStreet,
+      city: item.city || '',
+      state: item.state || '',
+      pincode: item.pincode || '',
+    });
+    setSelectedAddressId(item.id);
+    setUsedSavedAddr(true);
+    addToast(`Selected "${item.label || 'Saved Address'}"!`, 'success');
+  };
+
+  const handleAcceptSavedAddress = () => {
+    if (savedAddrData) {
+      const l1 = savedAddrData.line1 || savedAddrData.street || '';
+      const l2 = savedAddrData.line2 || '';
+      const fullStreet = l2 ? `${l1}, ${l2}` : l1;
+
+      setAddress({
+        name: savedAddrData.fullName || user?.name || '',
+        phone: savedAddrData.mobileNumber || '',
+        line1: l1,
+        line2: l2,
+        street: fullStreet,
+        city: savedAddrData.city || '',
+        state: savedAddrData.state || '',
+        pincode: savedAddrData.pincode || '',
+      });
+      setUsedSavedAddr(true);
+      addToast('Saved address details autofilled!', 'success');
+    }
+    setShowSavedAddrModal(false);
+  };
+
+  const handleDeclineSavedAddress = () => {
+    setShowSavedAddrModal(false);
+  };
+
+  const handleSaveCurrentAddress = async () => {
+    const activeL1 = address.line1 || address.street;
+    if (!user || !activeL1 || !address.city || !address.pincode) return;
+    try {
+      setSavingAddress(true);
+      await fetchApi('/auth/saved-address', {
+        method: 'PUT',
+        body: JSON.stringify({
+          fullName: address.name,
+          mobileNumber: address.phone,
+          line1: activeL1,
+          line2: address.line2 || '',
+          street: address.line2 ? `${activeL1}, ${address.line2}` : activeL1,
+          city: address.city,
+          state: address.state,
+          pincode: address.pincode,
+        }),
+      });
+      addToast('Delivery address saved for faster checkout next time!', 'success');
+      setShowSaveAddrPrompt(false);
+    } catch (err) {
+      addToast(err.message || 'Failed to save address', 'error');
+    } finally {
+      setSavingAddress(false);
+    }
+  };
 
   const loadRazorpayScript = () => {
     return new Promise((resolve) => {
@@ -52,13 +158,18 @@ export function Checkout() {
 
     setIsSubmitting(true);
     try {
-      const formattedItems = cartItems.map((item) => ({
-        product: item.product._id || item.product,
-        name: item.product.name,
-        image: item.product.images?.[0] || '',
-        price: item.product.price || item.price,
-        qty: item.qty,
-      }));
+      const formattedItems = cartItems.map((item) => {
+        const rawImg = item.product.images?.[0] || item.product.image || '';
+        const imgUrl = typeof rawImg === 'string' ? rawImg : (rawImg?.url || '');
+
+        return {
+          product: item.product._id || item.product,
+          name: item.product.name,
+          image: imgUrl,
+          price: item.product.price || item.price,
+          qty: item.qty,
+        };
+      });
 
       const payload = {
         items: formattedItems,
@@ -270,6 +381,23 @@ export function Checkout() {
           </div>
         </div>
 
+        {user && !usedSavedAddr && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 text-xs text-amber-900 flex items-center justify-between gap-3 font-sans">
+            <div className="flex items-center gap-2">
+              <Save className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Save this address for faster checkout next time?</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveCurrentAddress}
+              disabled={savingAddress}
+              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] rounded-lg shrink-0 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {savingAddress ? 'Saving...' : 'Save Address'}
+            </button>
+          </div>
+        )}
+
         {/* Full width primary action buttons */}
         <div className="space-y-3 pt-2">
           <div className="grid grid-cols-2 gap-3">
@@ -333,10 +461,78 @@ export function Checkout() {
           
           {/* Shipping Address Section */}
           <div className="bg-white p-6 rounded-2xl border border-wagh-border shadow-soft space-y-4">
-            <h3 className="font-editorial text-xl font-bold text-wagh-dark flex items-center gap-2">
-              <Truck className="w-5 h-5 text-wagh-teal" />
-              <span>1. Shipping Address</span>
+            <h3 className="font-editorial text-xl font-bold text-wagh-dark flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                <Truck className="w-5 h-5 text-wagh-teal" />
+                <span>1. Shipping Address</span>
+              </span>
+              {savedAddrData && (
+                <button
+                  type="button"
+                  onClick={handleAcceptSavedAddress}
+                  className="text-xs text-wagh-teal hover:underline font-mono-tag font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>Autofill Saved Address</span>
+                </button>
+              )}
             </h3>
+
+            {savedAddressesList.length > 0 && (
+              <div className="space-y-2.5 font-sans pt-1">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                  <span className="flex items-center gap-1.5 text-wagh-teal">
+                    <MapPin className="w-4 h-4" />
+                    <span>Saved Addresses ({savedAddressesList.length} available):</span>
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-normal">Click any address to autofill</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {savedAddressesList.map((item) => {
+                    const isSelected = selectedAddressId === item.id || (address.line1 && address.line1 === item.line1);
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => handleSelectAddress(item)}
+                        className={`p-3 rounded-xl border text-xs cursor-pointer transition-all flex flex-col justify-between space-y-1.5 ${
+                          isSelected
+                            ? 'bg-wagh-teal/10 border-wagh-teal text-slate-900 ring-2 ring-wagh-teal/30 shadow-xs'
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between font-bold text-slate-900">
+                          <span className="flex items-center gap-1.5">
+                            <span className="capitalize">{item.label || 'Saved Address'}</span>
+                            {item.isDefault && (
+                              <span className="text-[10px] bg-wagh-teal text-white px-1.5 py-0.2 rounded-md font-mono-tag">Default</span>
+                            )}
+                          </span>
+                          {isSelected && <CheckCircle2 className="w-4 h-4 text-wagh-teal shrink-0" />}
+                        </div>
+                        <p className="line-clamp-1 font-semibold text-slate-800">{item.line1 || item.street}</p>
+                        {item.line2 && <p className="line-clamp-1 text-[11px] text-slate-500">{item.line2}</p>}
+                        <p className="text-[11px] text-slate-500 font-mono-tag">{item.city}, {item.state} - {item.pincode}</p>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectAddress(item);
+                          }}
+                          className={`w-full mt-1 py-1.5 px-2 text-[11px] font-bold rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer ${
+                            isSelected
+                              ? 'bg-wagh-teal text-white shadow-2xs'
+                              : 'bg-white border border-slate-200 text-slate-700 hover:bg-wagh-teal/10 hover:text-wagh-teal'
+                          }`}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>{isSelected ? 'Address Selected' : 'Use This Address'}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm font-medium">
               <div>
@@ -361,15 +557,37 @@ export function Checkout() {
                 />
               </div>
 
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-mono-tag text-wagh-muted mb-1">Street Address</label>
-                <input
-                  type="text"
-                  required
-                  value={address.street}
-                  onChange={(e) => setAddress({ ...address, street: e.target.value })}
-                  className="w-full p-2.5 rounded-xl border border-wagh-border focus:outline-none focus:ring-2 focus:ring-wagh-teal"
-                />
+              <div className="sm:col-span-2 space-y-3">
+                <div>
+                  <label className="block text-xs font-mono-tag text-wagh-muted mb-1">Address Line 1 (Flat, House No, Building) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Flat 402, Wagh Residency, B-35 Ram Krishna Society"
+                    value={address.line1}
+                    onChange={(e) => {
+                      const newL1 = e.target.value;
+                      const fullSt = address.line2 ? `${newL1}, ${address.line2}` : newL1;
+                      setAddress({ ...address, line1: newL1, street: fullSt });
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-wagh-border focus:outline-none focus:ring-2 focus:ring-wagh-teal"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono-tag text-wagh-muted mb-1">Address Line 2 (Street, Area, Landmark)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Near SG Highway, Opp. City Mall"
+                    value={address.line2}
+                    onChange={(e) => {
+                      const newL2 = e.target.value;
+                      const fullSt = newL2 ? `${address.line1}, ${newL2}` : address.line1;
+                      setAddress({ ...address, line2: newL2, street: fullSt });
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-wagh-border focus:outline-none focus:ring-2 focus:ring-wagh-teal"
+                  />
+                </div>
               </div>
 
               <div>
@@ -499,6 +717,58 @@ export function Checkout() {
         </div>
 
       </form>
+
+      {/* SAVED ADDRESS REUSE MODAL */}
+      {showSavedAddrModal && savedAddrData && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in font-sans">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5">
+            <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+              <div className="w-10 h-10 rounded-2xl bg-wagh-teal/10 text-wagh-teal flex items-center justify-center shrink-0">
+                <MapPin className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Use Saved Delivery Address?</h3>
+                <p className="text-xs text-slate-500">We found a saved address on your profile</p>
+              </div>
+            </div>
+
+            {/* Address Preview Card */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1.5 font-mono-tag">
+              <div className="font-bold text-slate-900 text-sm flex items-center justify-between">
+                <span>{savedAddrData.fullName || user?.name || 'Saved Recipient'}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-wagh-teal/10 text-wagh-teal font-sans">{savedAddrData.source || 'Saved Default'}</span>
+              </div>
+              <p className="text-slate-800 font-bold font-sans">{savedAddrData.line1 || savedAddrData.street}</p>
+              {savedAddrData.line2 && (
+                <p className="text-slate-600 font-sans">{savedAddrData.line2}</p>
+              )}
+              <p className="text-slate-700 font-sans">{savedAddrData.city}, {savedAddrData.state} - {savedAddrData.pincode}</p>
+              {savedAddrData.mobileNumber && (
+                <p className="text-slate-500 font-sans pt-1">📞 {savedAddrData.mobileNumber}</p>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={handleAcceptSavedAddress}
+                className="flex-1 py-3 px-4 bg-wagh-teal hover:bg-wagh-teal-dark text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Yes, use these details</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleDeclineSavedAddress}
+                className="py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                No, use another
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

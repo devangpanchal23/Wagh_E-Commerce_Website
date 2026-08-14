@@ -22,13 +22,25 @@ exports.createOrder = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'No items in order' });
     }
 
-    // Server-side subtotal calculation
+    // Server-side subtotal calculation & image sanitization
     let calculatedSubtotal = 0;
-    for (const item of items) {
+    const sanitizedItems = items.map((item) => {
+      const rawImg = item.image || item.product?.images?.[0] || '';
+      const imgUrl = typeof rawImg === 'string' ? rawImg : (rawImg?.url || '');
+
+      return {
+        ...item,
+        image: imgUrl,
+        price: Number(item.price),
+        qty: Number(item.qty),
+      };
+    });
+
+    for (const item of sanitizedItems) {
       if (!item.price || !item.qty) {
         return res.status(400).json({ success: false, message: 'Invalid item price or quantity' });
       }
-      calculatedSubtotal += Number(item.price) * Number(item.qty);
+      calculatedSubtotal += item.price * item.qty;
     }
 
     // Coupon re-validation and discount calculation
@@ -75,7 +87,7 @@ exports.createOrder = async (req, res, next) => {
     const order = await Order.create({
       user: req.user._id,
       orderId: orderIdStr,
-      items,
+      items: sanitizedItems,
       shippingAddress,
       paymentMethod: paymentMethod || 'COD',
       paymentStatus: isPaid ? 'Paid' : 'Pending',

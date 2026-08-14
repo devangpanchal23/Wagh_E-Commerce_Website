@@ -38,7 +38,7 @@ export function Navbar({ onOpenSearch, onOpenMobileDrawer, onOpenAuthModal }) {
 
 
   return (
-    <header className={`sticky top-0 z-40 transition-all duration-300 ${scrolled ? 'glass-nav shadow-md border-b border-wagh-border/60 py-3' : 'bg-wagh-bg py-4 border-b border-wagh-border/40'}`}>
+    <header className={`sticky top-0 z-40 transition-all duration-300 print:hidden no-print ${scrolled ? 'glass-nav shadow-md border-b border-wagh-border/60 py-3' : 'bg-wagh-bg py-4 border-b border-wagh-border/40'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         
         {/* Left Mobile Menu Toggle + Logo */}
