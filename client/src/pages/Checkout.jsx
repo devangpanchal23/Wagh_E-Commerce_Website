@@ -337,8 +337,8 @@ export function Checkout() {
           </h3>
 
           <div className="flex justify-between items-center text-wagh-muted">
-            <span>Transaction ID</span>
-            <span className="font-bold text-wagh-dark">{completedOrder.orderId}</span>
+            <span>Order Reference</span>
+            <span className="font-bold text-wagh-dark font-mono-tag">{completedOrder.orderNumber || completedOrder.orderId}</span>
           </div>
 
           <div className="flex justify-between items-center text-wagh-muted">
@@ -402,14 +402,14 @@ export function Checkout() {
         <div className="space-y-3 pt-2">
           <div className="grid grid-cols-2 gap-3">
             <Link
-              to={`/orders/${completedOrder.orderId || completedOrder._id}/receipt/payment`}
+              to={`/orders/${completedOrder.orderNumber || completedOrder.orderId || completedOrder._id}/receipt/payment`}
               className="py-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs transition-all flex items-center justify-center gap-1.5"
             >
               <Receipt className="w-4 h-4 text-emerald-600" />
               <span>Payment Receipt</span>
             </Link>
             <Link
-              to={`/orders/${completedOrder.orderId || completedOrder._id}/receipt/invoice`}
+              to={`/orders/${completedOrder.orderNumber || completedOrder.orderId || completedOrder._id}/receipt/invoice`}
               className="py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5"
             >
               <FileText className="w-4 h-4 text-amber-400" />

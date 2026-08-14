@@ -78,8 +78,23 @@ exports.applyCoupon = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'This coupon code has expired.' });
     }
 
+    // Total Overall Usage Limit check
     if (coupon.usageLimit !== null && coupon.usageLimit !== undefined && coupon.usageCount >= coupon.usageLimit) {
-      return res.status(400).json({ success: false, message: 'Coupon redemption limit has been reached.' });
+      return res.status(400).json({ success: false, message: 'Total coupon redemption limit has been reached.' });
+    }
+
+    // Per-User Usage Limit check
+    if (req.user?._id) {
+      const userUsage = coupon.usedBy?.find(u => u.user && u.user.toString() === req.user._id.toString());
+      const timesUsed = userUsage ? userUsage.count : 0;
+      const userLimit = coupon.usageLimitPerUser !== null && coupon.usageLimitPerUser !== undefined ? coupon.usageLimitPerUser : 1;
+
+      if (timesUsed >= userLimit) {
+        return res.status(400).json({
+          success: false,
+          message: `You have already redeemed coupon '${coupon.code}' your maximum allowed limit of ${userLimit} time${userLimit > 1 ? 's' : ''}.`,
+        });
+      }
     }
 
     // Server-side authoritative cart calculation
@@ -137,6 +152,7 @@ exports.createCoupon = async (req, res, next) => {
       maxDiscountCap,
       expiryDate,
       usageLimit,
+      usageLimitPerUser,
     } = req.body;
 
     if (!code || !discountType || discountValue === undefined || !expiryDate) {
@@ -160,6 +176,7 @@ exports.createCoupon = async (req, res, next) => {
       maxDiscountCap: maxDiscountCap ? Number(maxDiscountCap) : null,
       expiryDate: new Date(expiryDate),
       usageLimit: usageLimit ? Number(usageLimit) : null,
+      usageLimitPerUser: usageLimitPerUser ? Number(usageLimitPerUser) : 1,
       status: 'draft',
       createdBy: req.user?._id || req.admin?.id || null,
     });
@@ -200,6 +217,7 @@ exports.updateCoupon = async (req, res, next) => {
       maxDiscountCap,
       expiryDate,
       usageLimit,
+      usageLimitPerUser,
     } = req.body;
 
     const coupon = await Coupon.findById(id);
@@ -214,6 +232,7 @@ exports.updateCoupon = async (req, res, next) => {
     if (maxDiscountCap !== undefined) coupon.maxDiscountCap = maxDiscountCap ? Number(maxDiscountCap) : null;
     if (expiryDate) coupon.expiryDate = new Date(expiryDate);
     if (usageLimit !== undefined) coupon.usageLimit = usageLimit ? Number(usageLimit) : null;
+    if (usageLimitPerUser !== undefined) coupon.usageLimitPerUser = Number(usageLimitPerUser) || 1;
 
     await coupon.save();
 

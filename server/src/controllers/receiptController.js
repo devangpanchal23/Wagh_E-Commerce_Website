@@ -10,9 +10,9 @@ const COMPANY_DETAILS = {
 };
 
 // Helper to generate sequential-style receipt number
-function generateReceiptNumber(orderId) {
+function generateReceiptNumber(orderRef) {
   const timestamp = Date.now().toString().slice(-6);
-  const cleanId = (orderId || '').replace(/[^a-zA-Z0-9]/g, '').slice(-4).toUpperCase();
+  const cleanId = (orderRef || '').replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase();
   return `WAG-PAY-${new Date().getFullYear()}-${cleanId || timestamp}`;
 }
 
@@ -22,7 +22,11 @@ exports.getPaymentReceipt = async (req, res, next) => {
     const { orderId } = req.params;
 
     const order = await Order.findOne({
-      $or: [{ _id: orderId.match(/^[0-9a-fA-F]{24}$/) ? orderId : null }, { orderId: orderId }]
+      $or: [
+        { _id: orderId.match(/^[0-9a-fA-F]{24}$/) ? orderId : null },
+        { orderNumber: orderId },
+        { orderId: orderId },
+      ].filter(Boolean),
     }).populate('user', 'name email mobileNumber').lean();
 
     if (!order) {
@@ -33,11 +37,13 @@ exports.getPaymentReceipt = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Unauthorized access to payment receipt' });
     }
 
+    const displayOrderId = order.orderNumber || order.orderId;
+
     // Retrieve or auto-create PaymentReceipt record
     let receipt = await PaymentReceipt.findOne({ order: order._id }).lean();
 
     if (!receipt) {
-      const receiptNumber = generateReceiptNumber(order.orderId);
+      const receiptNumber = generateReceiptNumber(displayOrderId);
       const subtotal = order.subtotal || order.total || 0;
       const gstAmount = order.gstAmount || Math.round(subtotal * 0.18 * 100) / 100;
       const cgst = order.gstBreakdown?.cgst || Math.round((gstAmount / 2) * 100) / 100;
@@ -49,40 +55,43 @@ exports.getPaymentReceipt = async (req, res, next) => {
       receipt = await PaymentReceipt.create({
         receiptNumber,
         order: order._id,
-        orderIdString: order.orderId,
+        orderIdString: displayOrderId,
         user: order.user._id,
         paymentDate,
         paymentTime,
         paymentMode: order.paymentMethod || 'COD',
-        gatewayTransactionId: order.razorpayPaymentId || order.razorpayOrderId || (order.paymentMethod === 'COD' ? 'COD-' + order.orderId : 'N/A'),
+        gatewayTransactionId: order.razorpayPaymentId || order.razorpayOrderId || (order.paymentMethod === 'COD' ? 'COD-' + displayOrderId : 'N/A'),
         subtotal,
         gstAmount,
         gstBreakdown: { cgst, sgst, igst: 0 },
-        couponCode: order.couponCode || '',
-        couponDiscountAmount: order.couponDiscount || order.discount || 0,
-        finalAmountPaid: order.total,
-        paymentStatus: order.paymentStatus === 'Paid' ? 'Success' : 'Pending',
+        totalAmountPaid: order.total,
+        status: order.paymentStatus === 'Paid' ? 'Success' : 'Pending',
       });
-      receipt = receipt.toObject();
     }
 
     res.status(200).json({
       success: true,
       message: 'Payment receipt fetched successfully',
       data: {
-        receipt,
-        order: {
-          orderId: order.orderId,
-          createdAt: order.createdAt,
-          itemsCount: order.items?.length || 0,
-          shippingAddress: order.shippingAddress,
-        },
+        receiptNumber: receipt.receiptNumber,
+        orderId: displayOrderId,
+        paymentDate: receipt.paymentDate,
+        paymentTime: receipt.paymentTime,
+        paymentMode: receipt.paymentMode,
+        gatewayTransactionId: receipt.gatewayTransactionId,
+        paymentStatus: receipt.status,
+        company: COMPANY_DETAILS,
         customer: {
           name: order.user?.name || order.shippingAddress?.name || 'Customer',
           email: order.user?.email || '',
           phone: order.shippingAddress?.phone || order.user?.mobileNumber || '',
         },
-        company: COMPANY_DETAILS,
+        financialBreakdown: {
+          subtotal: receipt.subtotal,
+          gstAmount: receipt.gstAmount,
+          gstBreakdown: receipt.gstBreakdown,
+          totalAmountPaid: receipt.totalAmountPaid,
+        },
       },
     });
   } catch (error) {
@@ -96,7 +105,11 @@ exports.getPurchaseInvoice = async (req, res, next) => {
     const { orderId } = req.params;
 
     const order = await Order.findOne({
-      $or: [{ _id: orderId.match(/^[0-9a-fA-F]{24}$/) ? orderId : null }, { orderId: orderId }]
+      $or: [
+        { _id: orderId.match(/^[0-9a-fA-F]{24}$/) ? orderId : null },
+        { orderNumber: orderId },
+        { orderId: orderId },
+      ].filter(Boolean),
     }).populate('user', 'name email mobileNumber').lean();
 
     if (!order) {
@@ -107,13 +120,14 @@ exports.getPurchaseInvoice = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Unauthorized access to purchase invoice' });
     }
 
+    const displayOrderId = order.orderNumber || order.orderId;
     const subtotal = order.subtotal || 0;
     const shippingFee = order.shippingFee || 0;
     const discount = order.couponDiscount || order.discount || 0;
     const gstAmount = order.gstAmount || Math.round((subtotal - discount) * 0.18 * 100) / 100;
     const cgst = order.gstBreakdown?.cgst || Math.round((gstAmount / 2) * 100) / 100;
     const sgst = order.gstBreakdown?.sgst || Math.round((gstAmount / 2) * 100) / 100;
-    const invoiceNumber = `INV-${(order.orderId || '').replace('WAGH-', '')}-${new Date(order.createdAt).getFullYear()}`;
+    const invoiceNumber = `INV-${displayOrderId}-${new Date(order.createdAt).getFullYear()}`;
 
     // Itemized lines
     const lineItems = (order.items || []).map((item, idx) => ({
@@ -132,24 +146,23 @@ exports.getPurchaseInvoice = async (req, res, next) => {
       data: {
         invoiceNumber,
         invoiceDate: order.createdAt,
-        orderId: order.orderId,
+        orderId: displayOrderId,
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
         orderStatus: order.orderStatus,
-        transactionId: order.razorpayPaymentId || order.razorpayOrderId || (order.paymentMethod === 'COD' ? 'COD-' + order.orderId : 'N/A'),
+        transactionId: order.razorpayPaymentId || order.razorpayOrderId || (order.paymentMethod === 'COD' ? 'COD-' + displayOrderId : 'N/A'),
         lineItems,
         summary: {
           subtotal,
           shippingFee,
           discount,
-          couponCode: order.couponCode || '',
           gstAmount,
           gstBreakdown: { cgst, sgst, igst: 0 },
           grandTotal: order.total,
         },
         shippingAddress: order.shippingAddress,
         customer: {
-          name: order.shippingAddress?.name || order.user?.name || 'Customer',
+          name: order.user?.name || order.shippingAddress?.name || 'Customer',
           email: order.user?.email || '',
           phone: order.shippingAddress?.phone || order.user?.mobileNumber || '',
         },

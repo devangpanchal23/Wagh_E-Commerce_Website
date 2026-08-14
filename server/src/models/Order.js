@@ -23,6 +23,12 @@ const orderSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  orderNumber: {
+    type: String,
+    unique: true,
+    sparse: true,
+    index: true,
+  },
   items: [orderItemSchema],
   shippingAddress: {
     name: { type: String, required: true },

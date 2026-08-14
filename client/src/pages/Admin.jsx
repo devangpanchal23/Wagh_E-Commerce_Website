@@ -4,7 +4,7 @@ import {
   ShieldAlert, ShieldCheck, Lock, Key, Package, ShoppingBag, Users, DollarSign,
   Plus, Edit, Trash2, CheckCircle2, AlertCircle, LogOut, Calendar, Filter,
   Clock, TrendingUp, Search, ChevronDown, ChevronRight, CheckCircle, Truck, XCircle, X, Check, Ruler,
-  Upload, Image as ImageIcon, Layers, Grid, ArrowUp, ArrowDown, FileText, List, Table, Crop, RefreshCw, HardDrive
+  Upload, Image as ImageIcon, Layers, Grid, ArrowUp, ArrowDown, FileText, List, Table, Crop, RefreshCw, HardDrive, Eye
 } from 'lucide-react';
 
 import { useToast } from '../context/ToastContext';
@@ -51,7 +51,7 @@ function OrderStatusDropdown({ currentStatus, onStatusChange }) {
       id: 'Delivered',
       label: 'Delivered (Completed)',
       icon: CheckCircle2,
-      colorClass: 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100',
+      colorClass: 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:emerald-100',
       badgeClass: 'bg-emerald-100 text-emerald-900',
       dotColor: 'bg-emerald-500',
     },
@@ -59,7 +59,7 @@ function OrderStatusDropdown({ currentStatus, onStatusChange }) {
       id: 'Cancelled',
       label: 'Cancelled',
       icon: XCircle,
-      colorClass: 'bg-rose-50 text-rose-800 border-rose-300 hover:bg-rose-100',
+      colorClass: 'bg-rose-50 text-rose-800 border-rose-300 hover:rose-100',
       badgeClass: 'bg-rose-100 text-rose-900',
       dotColor: 'bg-rose-500',
     },
@@ -100,17 +100,15 @@ function OrderStatusDropdown({ currentStatus, onStatusChange }) {
                   onStatusChange(s.id);
                   setIsOpen(false);
                 }}
-                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition-colors ${
                   isSelected ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-700 hover:bg-slate-50'
                 }`}
               >
-                <div className="flex items-center gap-2.5">
-                  <div className={`p-1 rounded-lg ${s.colorClass}`}>
-                    <SIcon className="w-3.5 h-3.5" />
-                  </div>
-                  <span className="font-sans">{s.label}</span>
+                <div className="flex items-center gap-2">
+                  <SIcon className="w-4 h-4 text-slate-500" />
+                  <span>{s.label}</span>
                 </div>
-                {isSelected && <Check className="w-4 h-4 text-wagh-teal shrink-0" />}
+                {isSelected && <Check className="w-4 h-4 text-emerald-600" />}
               </button>
             );
           })}
@@ -124,6 +122,10 @@ export function Admin() {
 
   const { addToast } = useToast();
   const navigate = useNavigate();
+
+  // Product & Order Modal View States
+  const [selectedViewProduct, setSelectedViewProduct] = useState(null);
+  const [selectedOrderModal, setSelectedOrderModal] = useState(null);
 
   // Standalone Admin token & auth state (completely isolated from customer auth)
   const [adminAuthenticated, setAdminAuthenticated] = useState(
@@ -363,7 +365,7 @@ export function Admin() {
     // 3. Search Query Filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      const matchId = order.orderId?.toLowerCase().includes(query);
+      const matchId = order.orderId?.toLowerCase().includes(query) || order.orderNumber?.toLowerCase().includes(query);
       const matchName = order.shippingAddress?.name?.toLowerCase().includes(query);
       const matchPhone = order.shippingAddress?.phone?.toLowerCase().includes(query);
       if (!matchId && !matchName && !matchPhone) return false;
@@ -1004,7 +1006,7 @@ export function Admin() {
                             {/* Order Card Header */}
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-wagh-border pb-3 gap-2 text-xs">
                               <div className="flex items-center gap-3">
-                                <span className="font-mono-tag font-extrabold text-wagh-teal text-base">{o.orderId}</span>
+                                <span className="font-mono-tag font-extrabold text-wagh-teal text-base">{o.orderNumber || o.orderId}</span>
                                 <span className="text-[11px] text-wagh-muted font-sans font-medium flex items-center gap-1">
                                   <Clock className="w-3.5 h-3.5 text-slate-400" />
                                   {new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -1019,6 +1021,15 @@ export function Admin() {
                                 <span className="font-sans font-extrabold text-wagh-dark text-base">
                                   ₹{o.total?.toLocaleString('en-IN')}
                                 </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedOrderModal(o)}
+                                  className="px-3 py-1.5 rounded-xl bg-wagh-teal/10 hover:bg-wagh-teal hover:text-white text-wagh-teal font-extrabold text-xs transition-all shadow-2xs cursor-pointer flex items-center gap-1"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>View Details</span>
+                                </button>
                               </div>
                             </div>
 
@@ -1088,7 +1099,7 @@ export function Admin() {
                   <tbody className="divide-y divide-wagh-border">
                     {orders.slice(0, 10).map((o) => (
                       <tr key={o._id} className="hover:bg-gray-50">
-                        <td className="p-3 font-bold text-wagh-teal">{o.orderId}</td>
+                        <td className="p-3 font-bold text-wagh-teal">{o.orderNumber || o.orderId}</td>
                         <td className="p-3 font-medium text-wagh-dark">{o.shippingAddress?.name || 'Customer'}</td>
                         <td className="p-3 font-bold">₹{o.total}</td>
                         <td className="p-3">{o.paymentMethod} ({o.paymentStatus})</td>
@@ -1170,6 +1181,13 @@ export function Admin() {
                           </td>
                           <td className="py-3 px-4 whitespace-nowrap">
                             <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => setSelectedViewProduct(p)}
+                                className="px-3.5 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-800 hover:text-white border border-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-slate-500" />
+                                <span>View</span>
+                              </button>
                               <button
                                 onClick={() => openEditModal(p)}
                                 className="px-3.5 py-1.5 rounded-xl bg-teal-50 text-wagh-teal hover:bg-wagh-teal hover:text-white border border-teal-200/60 font-semibold text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
@@ -2017,6 +2035,259 @@ export function Admin() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PRODUCT DETAILS VIEW MODAL (TASK 1) */}
+      {selectedViewProduct && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in font-sans">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-6">
+            
+            {/* Modal Header */}
+            <div className="flex justify-between items-start pb-4 border-b border-slate-100">
+              <div>
+                <span className="px-2.5 py-1 rounded-md bg-wagh-teal/10 text-wagh-teal text-[10px] font-extrabold uppercase tracking-wider">
+                  {selectedViewProduct.brand || 'WAGH'} • {categories.find(c => c._id === selectedViewProduct.category)?.name || 'Product Details'}
+                </span>
+                <h2 className="text-xl font-bold text-slate-900 mt-1">{selectedViewProduct.name}</h2>
+              </div>
+              <button
+                onClick={() => setSelectedViewProduct(null)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-100 transition-colors text-sm font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Gallery & Key Info */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <div className="aspect-square bg-slate-50 rounded-2xl border border-slate-200 p-3 flex items-center justify-center">
+                  <img src={selectedViewProduct.images?.[0]} alt={selectedViewProduct.name} className="max-h-full max-w-full object-contain" />
+                </div>
+                {selectedViewProduct.images?.length > 1 && (
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                    {selectedViewProduct.images.map((img, idx) => (
+                      <img key={idx} src={typeof img === 'string' ? img : img.url} alt="" className="w-12 h-12 rounded-lg border border-slate-200 p-1 object-contain bg-white shrink-0" />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-4 text-xs font-sans">
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">Price:</span>
+                    <span className="text-lg font-extrabold text-wagh-teal">₹{selectedViewProduct.price?.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">MRP:</span>
+                    <span className="text-slate-400 line-through">₹{selectedViewProduct.mrp?.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-200">
+                    <span className="text-slate-500">Stock Availability:</span>
+                    <span className={`font-bold px-2.5 py-0.5 rounded-full ${selectedViewProduct.stock < 10 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {selectedViewProduct.stock} Units In Stock
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 text-slate-700">
+                  <p><span className="font-bold text-slate-900">Dimensions:</span> {selectedViewProduct.specs?.dimensions || selectedViewProduct.dimensions || 'Standard'}</p>
+                  <p><span className="font-bold text-slate-900">Form Factor / Size:</span> {selectedViewProduct.specs?.size || selectedViewProduct.size || 'Standard'}</p>
+                  <p><span className="font-bold text-slate-900">Featured:</span> {selectedViewProduct.isFeatured ? 'Yes' : 'No'}</p>
+                  <p><span className="font-bold text-slate-900">New Arrival:</span> {selectedViewProduct.isNewArrival ? 'Yes' : 'No'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Description */}
+            {selectedViewProduct.description && (
+              <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Product Description & Summary</h4>
+                <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
+                  {selectedViewProduct.description}
+                </p>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+              <button
+                onClick={() => {
+                  handleDeleteProduct(selectedViewProduct._id);
+                  setSelectedViewProduct(null);
+                }}
+                className="px-4 py-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white font-bold rounded-xl text-xs transition-colors"
+              >
+                Delete Product
+              </button>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setSelectedViewProduct(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    openEditModal(selectedViewProduct);
+                    setSelectedViewProduct(null);
+                  }}
+                  className="px-5 py-2 bg-wagh-teal text-white hover:bg-wagh-teal-dark font-extrabold rounded-xl text-xs shadow-md cursor-pointer"
+                >
+                  Edit Product
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ORDER DETAILS POPUP MODAL (TASK 3) */}
+      {selectedOrderModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in font-sans">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-6">
+            
+            {/* Modal Header */}
+            <div className="flex justify-between items-start pb-4 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono-tag text-lg font-black text-wagh-teal">{selectedOrderModal.orderId}</span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
+                    {new Date(selectedOrderModal.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">Full Customer Order Details & Payment Metadata</p>
+              </div>
+
+              <button
+                onClick={() => setSelectedOrderModal(null)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-100 transition-colors text-sm font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Top Meta Pill Box */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-sans">
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Payment Mode</span>
+                <span className="font-bold text-slate-900 uppercase">{selectedOrderModal.paymentMethod || 'COD'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Payment Status</span>
+                <span className="font-bold text-emerald-600">{selectedOrderModal.paymentStatus || 'Pending'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Order Status</span>
+                <OrderStatusDropdown
+                  currentStatus={selectedOrderModal.orderStatus}
+                  onStatusChange={(newStatus) => {
+                    handleUpdateOrderStatus(selectedOrderModal._id, newStatus);
+                    setSelectedOrderModal({ ...selectedOrderModal, orderStatus: newStatus });
+                  }}
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Grand Total</span>
+                <span className="font-extrabold text-slate-900 text-sm">₹{selectedOrderModal.total?.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+
+            {/* Customer Delivery Details & Payment Info */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1.5">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Customer Shipping Details</span>
+                <p className="font-bold text-slate-900 text-sm">{selectedOrderModal.shippingAddress?.name || 'Customer'}</p>
+                <p className="text-slate-700"><span className="font-semibold text-slate-900">Phone:</span> {selectedOrderModal.shippingAddress?.phone}</p>
+                <p className="text-slate-700"><span className="font-semibold text-slate-900">Email:</span> {selectedOrderModal.customerEmail || selectedOrderModal.shippingAddress?.email || 'N/A'}</p>
+                <p className="text-slate-600 leading-relaxed mt-1">
+                  {selectedOrderModal.shippingAddress?.street}, {selectedOrderModal.shippingAddress?.city}, {selectedOrderModal.shippingAddress?.state} - {selectedOrderModal.shippingAddress?.pincode}
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1.5">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">Payment & Transaction Details</span>
+                <p className="text-slate-700"><span className="font-semibold text-slate-900">Payment Method:</span> {selectedOrderModal.paymentMethod}</p>
+                <p className="text-slate-700"><span className="font-semibold text-slate-900">Payment Status:</span> {selectedOrderModal.paymentStatus}</p>
+                {selectedOrderModal.razorpayPaymentId && (
+                  <p className="text-slate-700 font-mono-tag"><span className="font-semibold text-slate-900 font-sans">Razorpay Pay ID:</span> {selectedOrderModal.razorpayPaymentId}</p>
+                )}
+                {selectedOrderModal.razorpayOrderId && (
+                  <p className="text-slate-700 font-mono-tag"><span className="font-semibold text-slate-900 font-sans">Razorpay Order ID:</span> {selectedOrderModal.razorpayOrderId}</p>
+                )}
+                {selectedOrderModal.couponCode && (
+                  <p className="text-emerald-700 font-bold"><span className="font-semibold text-slate-900">Applied Coupon:</span> {selectedOrderModal.couponCode} (-₹{selectedOrderModal.discount})</p>
+                )}
+              </div>
+            </div>
+
+            {/* Ordered Line Items Table */}
+            <div className="space-y-2">
+              <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Ordered Products ({selectedOrderModal.items?.length || 0})</h4>
+              <div className="rounded-2xl border border-slate-100 overflow-hidden">
+                <table className="w-full text-left text-xs font-sans">
+                  <thead className="bg-slate-100/70 text-slate-700 font-bold border-b border-slate-100">
+                    <tr>
+                      <th className="py-2.5 px-4">Item</th>
+                      <th className="py-2.5 px-4 text-center">Qty</th>
+                      <th className="py-2.5 px-4 text-right">Price</th>
+                      <th className="py-2.5 px-4 text-right">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {selectedOrderModal.items?.map((item, idx) => (
+                      <tr key={idx}>
+                        <td className="py-3 px-4 flex items-center gap-3">
+                          <img src={item.image} alt={item.name} className="w-10 h-10 object-contain rounded-lg border border-slate-200 p-0.5 bg-white shrink-0" />
+                          <div>
+                            <p className="font-bold text-slate-900">{item.name}</p>
+                            <p className="text-[10px] text-slate-400 font-mono-tag">SKU: {item.sku || 'WAGH-PRODUCT'}</p>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-center font-bold text-slate-900">{item.qty}</td>
+                        <td className="py-3 px-4 text-right font-mono-tag text-slate-700">₹{item.price?.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-bold font-mono-tag text-slate-900">₹{(item.price * item.qty)?.toLocaleString('en-IN')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Invoice Navigation Links & Actions */}
+            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-4 border-t border-slate-100">
+              <div className="flex items-center gap-2">
+                <a
+                  href={`/orders/${selectedOrderModal.orderId}/receipt/invoice`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5"
+                >
+                  <span>View Tax Invoice</span>
+                </a>
+                <a
+                  href={`/orders/${selectedOrderModal.orderId}/receipt/payment`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5"
+                >
+                  <span>View Payment Receipt</span>
+                </a>
+              </div>
+
+              <button
+                onClick={() => setSelectedOrderModal(null)}
+                className="px-5 py-2 bg-wagh-teal text-white hover:bg-wagh-teal-dark font-extrabold rounded-xl text-xs shadow-md cursor-pointer"
+              >
+                Done / Close
+              </button>
+            </div>
+
           </div>
         </div>
       )}

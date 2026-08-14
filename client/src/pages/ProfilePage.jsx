@@ -265,7 +265,7 @@ export function ProfilePage() {
                   <div key={order._id} className="p-6 rounded-2xl border border-wagh-border space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-wagh-border pb-3 gap-2">
                       <div>
-                        <span className="font-mono-tag font-bold text-wagh-teal text-sm">{order.orderId}</span>
+                        <span className="font-mono-tag font-bold text-wagh-teal text-sm">{order.orderNumber || order.orderId}</span>
                         <span className="text-xs text-wagh-muted block font-mono-tag">
                           Placed on {new Date(order.createdAt).toLocaleDateString()}
                         </span>
@@ -294,14 +294,14 @@ export function ProfilePage() {
 
                     <div className="pt-3 border-t border-wagh-border/60 flex flex-wrap items-center justify-end gap-2 text-xs">
                       <Link
-                        to={`/orders/${order.orderId || order._id}/receipt/payment`}
+                        to={`/orders/${order.orderNumber || order.orderId || order._id}/receipt/payment`}
                         className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <Receipt className="w-3.5 h-3.5 text-emerald-600" />
                         <span>Payment Receipt</span>
                       </Link>
                       <Link
-                        to={`/orders/${order.orderId || order._id}/receipt/invoice`}
+                        to={`/orders/${order.orderNumber || order.orderId || order._id}/receipt/invoice`}
                         className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <FileText className="w-3.5 h-3.5 text-amber-400" />

@@ -4,6 +4,7 @@ const Coupon = require('../models/Coupon');
 const PaymentReceipt = require('../models/PaymentReceipt');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
+const { generateOrderNumber } = require('../utils/generateOrderNumber');
 
 exports.createOrder = async (req, res, next) => {
   try {
@@ -65,8 +66,19 @@ exports.createOrder = async (req, res, next) => {
             }
             calculatedDiscount = Math.min(calculatedDiscount, calculatedSubtotal);
 
-            // Increment usage count atomically
-            await Coupon.findByIdAndUpdate(coupon._id, { $inc: { usageCount: 1 } });
+            // Increment usage count and record user usage
+            coupon.usageCount = (coupon.usageCount || 0) + 1;
+            if (req.user?._id) {
+              if (!coupon.usedBy) coupon.usedBy = [];
+              const userIdx = coupon.usedBy.findIndex(u => u.user && u.user.toString() === req.user._id.toString());
+              if (userIdx >= 0) {
+                coupon.usedBy[userIdx].count += 1;
+                coupon.usedBy[userIdx].lastUsedAt = new Date();
+              } else {
+                coupon.usedBy.push({ user: req.user._id, count: 1, lastUsedAt: new Date() });
+              }
+            }
+            await coupon.save();
           }
         }
       }
@@ -81,12 +93,14 @@ exports.createOrder = async (req, res, next) => {
 
     const finalTotal = Math.round((netSubtotal + Number(shippingFee)) * 100) / 100;
     const orderIdStr = 'WAGH-' + Math.floor(100000 + Math.random() * 900000);
+    const orderNumber = await generateOrderNumber();
 
     const isPaid = paymentMethod === 'Razorpay' || (razorpayPaymentId ? true : false);
 
     const order = await Order.create({
       user: req.user._id,
       orderId: orderIdStr,
+      orderNumber,
       items: sanitizedItems,
       shippingAddress,
       paymentMethod: paymentMethod || 'COD',
