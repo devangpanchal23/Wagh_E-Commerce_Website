@@ -4,8 +4,8 @@ import { useToast } from '../context/ToastContext';
 import { ProfileHeader } from '../components/profile/ProfileHeader';
 import { ProfileDetailsForm } from '../components/profile/ProfileDetailsForm';
 import { AddressBook } from '../components/profile/AddressBook';
-import { ShieldCheck, AlertCircle, RefreshCw, LogOut, Package, Heart, User as UserIcon } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { ShieldCheck, AlertCircle, RefreshCw, LogOut, Package, Heart, User as UserIcon, Receipt, FileText } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useWishlist } from '../context/WishlistContext';
 import { ProductCard } from '../components/ProductCard';
 import { fetchApi } from '../api';
@@ -290,6 +290,23 @@ export function ProfilePage() {
                           </div>
                         </div>
                       ))}
+                    </div>
+
+                    <div className="pt-3 border-t border-wagh-border/60 flex flex-wrap items-center justify-end gap-2 text-xs">
+                      <Link
+                        to={`/orders/${order.orderId || order._id}/receipt/payment`}
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Payment Receipt</span>
+                      </Link>
+                      <Link
+                        to={`/orders/${order.orderId || order._id}/receipt/invoice`}
+                        className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Tax Invoice</span>
+                      </Link>
                     </div>
                   </div>
                 ))

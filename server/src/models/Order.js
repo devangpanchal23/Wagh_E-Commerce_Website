@@ -50,7 +50,18 @@ const orderSchema = new mongoose.Schema({
   subtotal: { type: Number, required: true },
   shippingFee: { type: Number, default: 0 },
   discount: { type: Number, default: 0 },
+  couponCode: { type: String, default: '' },
+  couponDiscount: { type: Number, default: 0 },
+  gstAmount: { type: Number, default: 0 },
+  gstBreakdown: {
+    cgst: { type: Number, default: 0 },
+    sgst: { type: Number, default: 0 },
+    igst: { type: Number, default: 0 },
+  },
   total: { type: Number, required: true },
+  razorpayOrderId: { type: String, default: '' },
+  razorpayPaymentId: { type: String, default: '' },
+  razorpaySignature: { type: String, default: '' },
 }, {
   timestamps: true,
 });

@@ -20,6 +20,8 @@ import { About } from './pages/About';
 import { Contact } from './pages/Contact';
 import { Profile } from './pages/Profile';
 import { Admin } from './pages/Admin';
+import PaymentReceipt from './pages/PaymentReceipt';
+import PurchaseInvoice from './pages/PurchaseInvoice';
 import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
 
@@ -140,6 +142,22 @@ function MainAppLayout() {
             element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/orders/:orderId/receipt/payment"
+            element={
+              <ProtectedRoute>
+                <PaymentReceipt />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/orders/:orderId/receipt/invoice"
+            element={
+              <ProtectedRoute>
+                <PurchaseInvoice />
               </ProtectedRoute>
             }
           />

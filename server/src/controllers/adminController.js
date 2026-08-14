@@ -377,3 +377,58 @@ exports.getAdminCategories = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Create admin category
+// @route   POST /api/v1/admin/categories
+exports.createAdminCategory = async (req, res, next) => {
+  try {
+    const { name, description, icon } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Category name is required' });
+    }
+
+    const nameTrimmed = name.trim();
+    const slug = nameTrimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+
+    const existing = await Category.findOne({ $or: [{ name: nameTrimmed }, { slug }] });
+    if (existing) {
+      return res.status(200).json({
+        success: true,
+        data: existing,
+        message: 'Category already exists',
+      });
+    }
+
+    const category = await Category.create({
+      name: nameTrimmed,
+      slug,
+      description: description || '',
+      icon: icon || 'Tag',
+    });
+
+    cache.invalidate('categories:', 'products:');
+
+    res.status(201).json({
+      success: true,
+      data: category,
+      message: 'Category created successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete admin category
+// @route   DELETE /api/v1/admin/categories/:id
+exports.deleteAdminCategory = async (req, res, next) => {
+  try {
+    await Category.findByIdAndDelete(req.params.id);
+    cache.invalidate('categories:', 'products:');
+    res.json({
+      success: true,
+      message: 'Category deleted successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};

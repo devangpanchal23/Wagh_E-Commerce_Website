@@ -15,6 +15,8 @@ const reviewRoutes = require('./routes/reviewRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const googleDriveRoutes = require('./routes/googleDriveRoutes');
 const extraRoutes = require('./routes/extraRoutes');
+const couponRoutes = require('./routes/couponRoutes');
+const receiptRoutes = require('./routes/receiptRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -90,6 +92,8 @@ app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/categories', categoryRoutes);
 app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/orders', orderRoutes);
+app.use('/api/v1', receiptRoutes);
+app.use('/api/v1', couponRoutes);
 app.use('/api/v1', reviewRoutes);
 app.use('/api/v1', extraRoutes);
 

@@ -12,6 +12,8 @@ import { fetchAdminApi } from '../api';
 import { AdminLoginForm } from '../components/AdminLoginForm';
 import { ImageCropModal } from '../components/admin/ImageCropModal';
 import { GoogleDrivePickerButton } from '../components/GoogleDrivePickerButton';
+import { AdminCoupons } from '../components/admin/AdminCoupons';
+import { Tag } from 'lucide-react';
 
 // Custom Order Status Dropdown Component
 function OrderStatusDropdown({ currentStatus, onStatusChange }) {
@@ -190,6 +192,69 @@ export function Admin() {
     isBestSeller: false,
     sections: [],
   });
+
+  // Category Creation Modal State
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryDesc, setNewCategoryDesc] = useState('');
+  const [creatingCategory, setCreatingCategory] = useState(false);
+
+  const handleCreateCategory = async (e) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) {
+      addToast('Category name is required', 'error');
+      return;
+    }
+
+    try {
+      setCreatingCategory(true);
+      const res = await fetchAdminApi('/admin/categories', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newCategoryName.trim(),
+          description: newCategoryDesc.trim(),
+        }),
+      });
+
+      if (res.success && res.data) {
+        addToast(`Category '${res.data.name}' ready!`, 'success');
+
+        // Refresh categories list
+        const catRes = await fetchAdminApi('/admin/categories');
+        if (catRes && catRes.success) {
+          setCategories(catRes.data);
+        }
+
+        // Auto select newly created category in product form
+        setProductForm((prev) => ({
+          ...prev,
+          category: res.data._id || prev.category,
+        }));
+
+        setNewCategoryName('');
+        setNewCategoryDesc('');
+        setShowCategoryModal(false);
+      }
+    } catch (err) {
+      addToast(err.message || 'Failed to create category', 'error');
+    } finally {
+      setCreatingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = async (id, name) => {
+    if (!window.confirm(`Delete category '${name}'?`)) return;
+    try {
+      const res = await fetchAdminApi(`/admin/categories/${id}`, { method: 'DELETE' });
+      if (res.success) {
+        addToast(`Category '${name}' deleted`, 'info');
+        const catRes = await fetchAdminApi('/admin/categories');
+        if (catRes && catRes.success) setCategories(catRes.data);
+      }
+    } catch (err) {
+      addToast(err.message || 'Failed to delete category', 'error');
+    }
+  };
 
 
 
@@ -688,6 +753,14 @@ export function Admin() {
           </div>
 
           <button
+            onClick={() => setShowCategoryModal(true)}
+            className="px-4 py-2.5 rounded-full bg-slate-800 text-white font-bold text-xs hover:bg-slate-700 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
+          >
+            <Tag className="w-4 h-4 text-amber-400" />
+            <span>Manage Categories ({categories.length})</span>
+          </button>
+
+          <button
             onClick={openCreateModal}
             className="px-5 py-2.5 rounded-full bg-wagh-teal text-white font-bold text-xs hover:bg-wagh-teal-dark transition-colors flex items-center gap-2 shadow-sm"
           >
@@ -772,9 +845,20 @@ export function Admin() {
             <Package className="w-4 h-4" />
             <span>Products Catalog ({products.length})</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('coupons')}
+            className={`py-4 px-6 font-mono-tag text-xs font-bold uppercase transition-all flex items-center gap-2 ${
+              activeTab === 'coupons' ? 'border-b-2 border-wagh-teal text-wagh-teal bg-white shadow-xs' : 'text-wagh-muted hover:text-wagh-dark'
+            }`}
+          >
+            <Tag className="w-4 h-4 text-amber-500" />
+            <span>Coupons & Discount System</span>
+          </button>
         </div>
 
         <div className="p-6">
+          {activeTab === 'coupons' && <AdminCoupons />}
           
           {/* TAB 1: ORDER TIMELINE & CATEGORIZED TRACKING VIEW */}
           {activeTab === 'orders' && (
@@ -1178,7 +1262,16 @@ export function Admin() {
                       />
                     </div>
                     <div>
-                      <label className="block text-slate-700 mb-1 font-semibold">Category *</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-slate-700 font-semibold">Category *</label>
+                        <button
+                          type="button"
+                          onClick={() => setShowCategoryModal(true)}
+                          className="text-[11px] font-bold text-wagh-teal hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" /> Add Category
+                        </button>
+                      </div>
                       <select
                         required
                         value={productForm.category || categories[0]?._id || ''}
@@ -1841,6 +1934,91 @@ export function Admin() {
           }}
           onCropComplete={handleCropComplete}
         />
+      )}
+
+      {/* CATEGORY CREATION & MANAGEMENT MODAL */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in font-sans">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Tag className="w-5 h-5 text-amber-500" />
+                <span>Create & Manage Categories</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowCategoryModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* New Category Form */}
+            <form onSubmit={handleCreateCategory} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Category Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Wireless Earbuds, Fast Chargers, Power Banks..."
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-wagh-teal focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Description (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. High speed PD fast charging adapters"
+                  value={newCategoryDesc}
+                  onChange={(e) => setNewCategoryDesc(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-wagh-teal focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={creatingCategory}
+                className="w-full py-2.5 bg-wagh-teal hover:bg-wagh-teal-dark text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{creatingCategory ? 'Creating Category...' : 'Save & Select Category'}</span>
+              </button>
+            </form>
+
+            {/* Existing Categories List */}
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Existing Categories ({categories.length})
+              </h4>
+              {categories.length === 0 ? (
+                <p className="text-xs text-slate-400">No categories created yet.</p>
+              ) : (
+                <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                  {categories.map((cat) => (
+                    <div key={cat._id} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                      <div>
+                        <span className="font-bold text-slate-800">{cat.name}</span>
+                        {cat.description && <span className="text-[10px] text-slate-400 block">{cat.description}</span>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCategory(cat._id, cat.name)}
+                        className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg transition-colors cursor-pointer"
+                        title="Delete category"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

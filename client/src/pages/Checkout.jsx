@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ShoppingBag, ShieldCheck, CreditCard, CheckCircle2, AlertCircle, ArrowLeft, Lock } from 'lucide-react';
+import { ShoppingBag, ShieldCheck, CreditCard, CheckCircle2, AlertCircle, ArrowLeft, Lock, Receipt, FileText } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -270,8 +270,24 @@ export function Checkout() {
           </div>
         </div>
 
-        {/* Full width primary action button */}
+        {/* Full width primary action buttons */}
         <div className="space-y-3 pt-2">
+          <div className="grid grid-cols-2 gap-3">
+            <Link
+              to={`/orders/${completedOrder.orderId || completedOrder._id}/receipt/payment`}
+              className="py-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs transition-all flex items-center justify-center gap-1.5"
+            >
+              <Receipt className="w-4 h-4 text-emerald-600" />
+              <span>Payment Receipt</span>
+            </Link>
+            <Link
+              to={`/orders/${completedOrder.orderId || completedOrder._id}/receipt/invoice`}
+              className="py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5"
+            >
+              <FileText className="w-4 h-4 text-amber-400" />
+              <span>Tax Invoice</span>
+            </Link>
+          </div>
           <Link
             to="/profile"
             className="w-full py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-sm shadow-md transition-all block text-center"

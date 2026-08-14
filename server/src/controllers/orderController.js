@@ -1,27 +1,118 @@
 const Order = require('../models/Order');
 const Cart = require('../models/Cart');
+const Coupon = require('../models/Coupon');
+const PaymentReceipt = require('../models/PaymentReceipt');
+const Razorpay = require('razorpay');
+const crypto = require('crypto');
 
 exports.createOrder = async (req, res, next) => {
   try {
-    const { items, shippingAddress, paymentMethod, subtotal, shippingFee, discount, total } = req.body;
+    const {
+      items,
+      shippingAddress,
+      paymentMethod,
+      shippingFee = 0,
+      couponCode,
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature,
+    } = req.body;
 
-    if (!items || items.length === 0) {
+    if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, message: 'No items in order' });
     }
 
-    const orderId = 'WAGH-' + Math.floor(100000 + Math.random() * 900000);
+    // Server-side subtotal calculation
+    let calculatedSubtotal = 0;
+    for (const item of items) {
+      if (!item.price || !item.qty) {
+        return res.status(400).json({ success: false, message: 'Invalid item price or quantity' });
+      }
+      calculatedSubtotal += Number(item.price) * Number(item.qty);
+    }
+
+    // Coupon re-validation and discount calculation
+    let appliedCouponCode = '';
+    let calculatedDiscount = 0;
+
+    if (couponCode && typeof couponCode === 'string' && couponCode.trim()) {
+      const codeUpper = couponCode.trim().toUpperCase();
+      const coupon = await Coupon.findOne({ code: codeUpper });
+
+      if (coupon && coupon.status === 'published' && new Date() <= new Date(coupon.expiryDate)) {
+        if (coupon.usageLimit === null || coupon.usageCount < coupon.usageLimit) {
+          if (calculatedSubtotal >= coupon.minCartValue) {
+            appliedCouponCode = coupon.code;
+            if (coupon.discountType === 'percentage') {
+              calculatedDiscount = (calculatedSubtotal * coupon.discountValue) / 100;
+              if (coupon.maxDiscountCap && coupon.maxDiscountCap > 0) {
+                calculatedDiscount = Math.min(calculatedDiscount, coupon.maxDiscountCap);
+              }
+            } else if (coupon.discountType === 'flat') {
+              calculatedDiscount = coupon.discountValue;
+            }
+            calculatedDiscount = Math.min(calculatedDiscount, calculatedSubtotal);
+
+            // Increment usage count atomically
+            await Coupon.findByIdAndUpdate(coupon._id, { $inc: { usageCount: 1 } });
+          }
+        }
+      }
+    }
+
+    const netSubtotal = Math.max(0, calculatedSubtotal - calculatedDiscount);
+
+    // GST Calculation: 18% standard rate included/added on net subtotal
+    const gstAmount = Math.round((netSubtotal * 0.18) * 100) / 100;
+    const cgst = Math.round((gstAmount / 2) * 100) / 100;
+    const sgst = Math.round((gstAmount / 2) * 100) / 100;
+
+    const finalTotal = Math.round((netSubtotal + Number(shippingFee)) * 100) / 100;
+    const orderIdStr = 'WAGH-' + Math.floor(100000 + Math.random() * 900000);
+
+    const isPaid = paymentMethod === 'Razorpay' || (razorpayPaymentId ? true : false);
 
     const order = await Order.create({
       user: req.user._id,
-      orderId,
+      orderId: orderIdStr,
       items,
       shippingAddress,
       paymentMethod: paymentMethod || 'COD',
-      paymentStatus: paymentMethod === 'Razorpay' ? 'Paid' : 'Pending',
-      subtotal,
-      shippingFee: shippingFee || 0,
-      discount: discount || 0,
-      total,
+      paymentStatus: isPaid ? 'Paid' : 'Pending',
+      subtotal: Math.round(calculatedSubtotal * 100) / 100,
+      shippingFee: Number(shippingFee) || 0,
+      discount: Math.round(calculatedDiscount * 100) / 100,
+      couponCode: appliedCouponCode,
+      couponDiscount: Math.round(calculatedDiscount * 100) / 100,
+      gstAmount,
+      gstBreakdown: { cgst, sgst, igst: 0 },
+      total: finalTotal,
+      razorpayOrderId: razorpayOrderId || '',
+      razorpayPaymentId: razorpayPaymentId || '',
+      razorpaySignature: razorpaySignature || '',
+    });
+
+    // Auto-create initial PaymentReceipt
+    const receiptNumber = `WAG-PAY-${new Date().getFullYear()}-${orderIdStr.replace('WAGH-', '')}`;
+    const paymentDate = order.createdAt || new Date();
+    const paymentTime = new Date(paymentDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+    await PaymentReceipt.create({
+      receiptNumber,
+      order: order._id,
+      orderIdString: order.orderId,
+      user: req.user._id,
+      paymentDate,
+      paymentTime,
+      paymentMode: order.paymentMethod,
+      gatewayTransactionId: razorpayPaymentId || razorpayOrderId || (order.paymentMethod === 'COD' ? `COD-${order.orderId}` : 'N/A'),
+      subtotal: order.subtotal,
+      gstAmount,
+      gstBreakdown: { cgst, sgst, igst: 0 },
+      couponCode: appliedCouponCode,
+      couponDiscountAmount: calculatedDiscount,
+      finalAmountPaid: order.total,
+      paymentStatus: isPaid ? 'Success' : 'Pending',
     });
 
     // Clear user cart after placing order
@@ -30,7 +121,7 @@ exports.createOrder = async (req, res, next) => {
     res.status(201).json({
       success: true,
       data: order,
-      message: 'Order placed successfully'
+      message: 'Order placed successfully',
     });
   } catch (error) {
     next(error);
@@ -40,13 +131,13 @@ exports.createOrder = async (req, res, next) => {
 exports.getMyOrders = async (req, res, next) => {
   try {
     const orders = await Order.find({ user: req.user._id })
-      .select('orderId items shippingAddress paymentMethod paymentStatus orderStatus subtotal shippingFee discount total createdAt')
+      .select('orderId items shippingAddress paymentMethod paymentStatus orderStatus subtotal shippingFee discount couponCode couponDiscount gstAmount total createdAt razorpayPaymentId razorpayOrderId')
       .sort({ createdAt: -1 })
       .lean();
     res.json({
       success: true,
       data: orders,
-      message: 'Orders fetched'
+      message: 'Orders fetched',
     });
   } catch (error) {
     next(error);
@@ -65,7 +156,7 @@ exports.getOrderById = async (req, res, next) => {
     res.json({
       success: true,
       data: order,
-      message: 'Order details fetched'
+      message: 'Order details fetched',
     });
   } catch (error) {
     next(error);
@@ -84,7 +175,7 @@ exports.getAllOrders = async (req, res, next) => {
     res.json({
       success: true,
       data: orders,
-      message: 'All orders fetched'
+      message: 'All orders fetched',
     });
   } catch (error) {
     next(error);
@@ -101,21 +192,27 @@ exports.updateOrderStatus = async (req, res, next) => {
     }
 
     if (orderStatus) order.orderStatus = orderStatus;
-    if (paymentStatus) order.paymentStatus = paymentStatus;
+    if (paymentStatus) {
+      order.paymentStatus = paymentStatus;
+      // Sync PaymentReceipt status if updated to Paid
+      if (paymentStatus === 'Paid') {
+        await PaymentReceipt.findOneAndUpdate(
+          { order: order._id },
+          { paymentStatus: 'Success' }
+        );
+      }
+    }
 
     await order.save();
     res.json({
       success: true,
       data: order,
-      message: 'Order status updated'
+      message: 'Order status updated',
     });
   } catch (error) {
     next(error);
   }
 };
-
-const Razorpay = require('razorpay');
-const crypto = require('crypto');
 
 // Create Razorpay Order (Backend Step 1)
 exports.createRazorpayOrder = async (req, res, next) => {
@@ -131,7 +228,6 @@ exports.createRazorpayOrder = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid amount provided' });
     }
 
-    // Convert rupees to paise (1 Rupee = 100 Paise)
     const amountInPaise = Math.round(numAmount * 100);
 
     if (amountInPaise < 100) {
@@ -184,7 +280,7 @@ exports.createRazorpayOrder = async (req, res, next) => {
 // Verify Razorpay Signature (Backend Step 3)
 exports.verifyRazorpayPayment = async (req, res, next) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId } = req.body;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return res.status(400).json({
@@ -208,6 +304,29 @@ exports.verifyRazorpayPayment = async (req, res, next) => {
       .digest('hex');
 
     if (expectedSignature === razorpay_signature) {
+      // If an existing order ID was provided, update it directly
+      if (orderId) {
+        const order = await Order.findOne({
+          $or: [{ _id: orderId.match(/^[0-9a-fA-F]{24}$/) ? orderId : null }, { orderId: orderId }],
+        });
+
+        if (order) {
+          order.paymentStatus = 'Paid';
+          order.razorpayOrderId = razorpay_order_id;
+          order.razorpayPaymentId = razorpay_payment_id;
+          order.razorpaySignature = razorpay_signature;
+          await order.save();
+
+          await PaymentReceipt.findOneAndUpdate(
+            { order: order._id },
+            {
+              gatewayTransactionId: razorpay_payment_id,
+              paymentStatus: 'Success',
+            }
+          );
+        }
+      }
+
       return res.status(200).json({
         success: true,
         message: 'Razorpay payment signature verified successfully',

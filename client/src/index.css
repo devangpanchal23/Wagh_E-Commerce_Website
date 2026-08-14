@@ -113,3 +113,12 @@
   cursor: pointer;
 }
 
+/* Suppress injected webview/devtool title nameplate badges */
+[class*="nameplate"],
+[class*="preview-title"],
+[data-preview-badge],
+div[style*="Double-click"] {
+  display: none !important;
+}
+
+

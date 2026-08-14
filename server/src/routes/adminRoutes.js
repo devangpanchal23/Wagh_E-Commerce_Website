@@ -15,8 +15,11 @@ const {
   updateAdminProduct,
   deleteAdminProduct,
   getAdminCategories,
+  createAdminCategory,
+  deleteAdminCategory,
 } = require('../controllers/adminController');
 const { uploadProductImage, getMediaGallery } = require('../controllers/mediaController');
+const couponController = require('../controllers/couponController');
 const { verifyAdminToken } = require('../middleware/adminAuth');
 
 // Multer Storage setup for local product image uploads
@@ -76,6 +79,16 @@ router.put('/products/:id', updateAdminProduct);
 router.delete('/products/:id', deleteAdminProduct);
 
 router.get('/categories', getAdminCategories);
+router.post('/categories', createAdminCategory);
+router.delete('/categories/:id', deleteAdminCategory);
+
+// Admin Coupon Management Routes (protected by verifyAdminToken)
+router.get('/coupons', couponController.getAllCoupons);
+router.post('/coupons', couponController.createCoupon);
+router.patch('/coupons/:id', couponController.updateCoupon);
+router.patch('/coupons/:id/publish', couponController.publishCoupon);
+router.patch('/coupons/:id/unpublish', couponController.unpublishCoupon);
+router.delete('/coupons/:id', couponController.deleteCoupon);
 
 // Media Gallery & Image Upload Routes
 router.post('/upload', upload.single('image'), uploadProductImage);

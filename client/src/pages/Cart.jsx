@@ -6,25 +6,47 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { CheckoutButton } from '../components/CheckoutButton';
 import { ProductImage } from '../components/ProductImage';
+import { fetchApi } from '../api';
 
 export function Cart() {
   const { cartItems, updateQty, removeFromCart, clearCart, subtotal, shippingFee, grandTotal } = useCart();
-  const { user } = useAuth();
+  const { getToken } = useAuth();
   const [coupon, setCoupon] = useState('');
   const [discount, setDiscount] = useState(0);
   const [couponApplied, setCouponApplied] = useState(false);
+  const [appliedCouponData, setAppliedCouponData] = useState(null);
+  const [couponError, setCouponError] = useState('');
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
   const { addToast } = useToast();
   const navigate = useNavigate();
 
-  const handleApplyCoupon = (e) => {
+  const handleApplyCoupon = async (e) => {
     e.preventDefault();
     if (!coupon.trim()) return;
-    if (coupon.toUpperCase() === 'WAGH200' || coupon.toUpperCase() === 'FIRST200') {
-      setDiscount(200);
-      setCouponApplied(true);
-      addToast('Coupon WAGH200 applied! ₹200 discount added.', 'success');
-    } else {
-      addToast('Invalid coupon code. Try "WAGH200"', 'error');
+    setCouponError('');
+    setApplyingCoupon(true);
+
+    try {
+      const res = await fetchApi('/coupons/apply', {
+        method: 'POST',
+        body: JSON.stringify({ couponCode: coupon.trim() }),
+        getToken,
+      });
+
+      if (res.success && res.data) {
+        setDiscount(res.data.discountAmount);
+        setAppliedCouponData(res.data);
+        setCouponApplied(true);
+        addToast(res.message || `Coupon '${res.data.couponCode}' applied!`, 'success');
+      }
+    } catch (err) {
+      setDiscount(0);
+      setAppliedCouponData(null);
+      setCouponApplied(false);
+      setCouponError(err.message || 'Invalid coupon code');
+      addToast(err.message || 'Failed to apply coupon', 'error');
+    } finally {
+      setApplyingCoupon(false);
     }
   };
 
@@ -208,23 +230,34 @@ export function Cart() {
               <Tag className="w-4 h-4 text-wagh-muted absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Coupon (e.g. WAGH200)"
+                placeholder="Coupon (e.g. SAVE20)"
                 value={coupon}
-                onChange={(e) => setCoupon(e.target.value)}
+                onChange={(e) => {
+                  setCoupon(e.target.value);
+                  if (couponError) setCouponError('');
+                }}
                 className="w-full pl-9 pr-3 py-2 rounded-xl border border-wagh-border text-xs font-mono-tag uppercase focus:outline-none focus:ring-2 focus:ring-wagh-teal"
               />
             </div>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-wagh-dark text-white font-mono-tag text-xs font-bold hover:bg-wagh-teal transition-colors shrink-0"
+              disabled={applyingCoupon}
+              className="px-4 py-2 rounded-xl bg-wagh-dark text-white font-mono-tag text-xs font-bold hover:bg-wagh-teal transition-colors shrink-0 disabled:opacity-50 cursor-pointer"
             >
-              Apply
+              {applyingCoupon ? 'Checking...' : 'Apply'}
             </button>
           </form>
 
-          {couponApplied && (
-            <div className="text-xs font-mono-tag text-wagh-success bg-green-50 p-2 rounded-lg border border-green-200">
-              ✓ Code WAGH200 Applied (-₹200)
+          {couponApplied && appliedCouponData && (
+            <div className="text-xs font-mono-tag text-emerald-800 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 flex items-center justify-between">
+              <span>✓ Code <strong>{appliedCouponData.couponCode}</strong> Applied</span>
+              <span className="font-bold text-emerald-700">-₹{appliedCouponData.discountAmount}</span>
+            </div>
+          )}
+
+          {couponError && (
+            <div className="text-xs font-mono-tag text-rose-800 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+              ⚠️ {couponError}
             </div>
           )}
 
