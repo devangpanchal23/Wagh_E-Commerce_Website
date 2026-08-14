@@ -10,7 +10,7 @@ import { fetchApi } from '../api';
 
 export function Cart() {
   const { cartItems, updateQty, removeFromCart, clearCart, subtotal, shippingFee, grandTotal } = useCart();
-  const { getToken } = useAuth();
+  const { user, getToken } = useAuth();
   const [coupon, setCoupon] = useState('');
   const [discount, setDiscount] = useState(0);
   const [couponApplied, setCouponApplied] = useState(false);
@@ -27,9 +27,19 @@ export function Cart() {
     setApplyingCoupon(true);
 
     try {
+      const formattedItems = cartItems.map((item) => ({
+        product: item.product?._id || item.product?.id || item.product,
+        price: item.product?.price || item.price,
+        qty: item.qty || 1,
+      }));
+
       const res = await fetchApi('/coupons/apply', {
         method: 'POST',
-        body: JSON.stringify({ couponCode: coupon.trim() }),
+        body: JSON.stringify({
+          couponCode: coupon.trim(),
+          items: formattedItems,
+          cartTotal: subtotal,
+        }),
         getToken,
       });
 

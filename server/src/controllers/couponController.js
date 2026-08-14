@@ -3,22 +3,55 @@ const Cart = require('../models/Cart');
 const Product = require('../models/Product');
 
 // Helper function to calculate server-side authoritative cart total
-async function calculateCartTotal(userId) {
-  const cart = await Cart.findOne({ user: userId });
-  if (!cart || !cart.items || cart.items.length === 0) {
-    return 0;
+async function calculateCartTotal(req) {
+  const { items, cartTotal, subtotal } = req.body;
+
+  // 1. Calculate from submitted items array using authoritative DB product prices
+  if (items && Array.isArray(items) && items.length > 0) {
+    const productIds = items
+      .map(item => item.product?._id || item.product?.id || item.product || item.productId)
+      .filter(Boolean);
+
+    if (productIds.length > 0) {
+      const products = await Product.find({ _id: { $in: productIds } }).lean();
+      const productMap = new Map(products.map(p => [p._id.toString(), p.price]));
+
+      let total = 0;
+      for (const item of items) {
+        const pId = (item.product?._id || item.product?.id || item.product || item.productId || '').toString();
+        const officialPrice = productMap.get(pId) || Number(item.price) || 0;
+        const qty = Number(item.qty) || 1;
+        total += officialPrice * qty;
+      }
+
+      if (total > 0) return total;
+    }
   }
 
-  const productIds = cart.items.map(item => item.product);
-  const products = await Product.find({ _id: { $in: productIds } }).lean();
-  const productMap = new Map(products.map(p => [p._id.toString(), p.price]));
+  // 2. Query MongoDB Cart collection if authenticated user is present
+  if (req.user?._id) {
+    const cart = await Cart.findOne({ user: req.user._id }).lean();
+    if (cart && cart.items && cart.items.length > 0) {
+      const productIds = cart.items.map(item => item.product).filter(Boolean);
+      const products = await Product.find({ _id: { $in: productIds } }).lean();
+      const productMap = new Map(products.map(p => [p._id.toString(), p.price]));
 
-  let total = 0;
-  for (const item of cart.items) {
-    const price = productMap.get(item.product.toString()) || item.priceAtAdd || 0;
-    total += price * item.qty;
+      let total = 0;
+      for (const item of cart.items) {
+        const price = productMap.get(item.product.toString()) || item.priceAtAdd || 0;
+        total += price * (item.qty || 1);
+      }
+      if (total > 0) return total;
+    }
   }
-  return total;
+
+  // 3. Fallback to client-submitted subtotal/cartTotal hint
+  const fallbackVal = Number(cartTotal || subtotal || 0);
+  if (!isNaN(fallbackVal) && fallbackVal > 0) {
+    return fallbackVal;
+  }
+
+  return 0;
 }
 
 // Client: Apply coupon to cart
@@ -50,7 +83,7 @@ exports.applyCoupon = async (req, res, next) => {
     }
 
     // Server-side authoritative cart calculation
-    const cartTotal = await calculateCartTotal(req.user._id);
+    const cartTotal = await calculateCartTotal(req);
 
     if (cartTotal < coupon.minCartValue) {
       const shortfall = coupon.minCartValue - cartTotal;
