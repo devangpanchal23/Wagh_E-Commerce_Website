@@ -219,39 +219,71 @@ export function Home() {
         )}
       </section>
 
-      {/* FLAGSHIP BANNER */}
+      {/* WAGH ALL IN 1 2.0 FEATURED PRODUCT BANNER (Located after Best Selling Products) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-wagh-dark text-white rounded-3xl overflow-hidden shadow-2xl grid grid-cols-1 lg:grid-cols-12 items-center border border-gray-800">
-          <div className="lg:col-span-7 p-8 sm:p-12 space-y-6">
-            <span className="font-mono-tag text-xs font-bold uppercase tracking-widest text-wagh-gold bg-wagh-teal/30 px-3 py-1 rounded-full border border-wagh-gold/30">
-              NEW RELEASE
-            </span>
+        <div className="bg-slate-900 text-white rounded-3xl overflow-hidden shadow-2xl grid grid-cols-1 lg:grid-cols-12 items-center border border-wagh-teal/30">
+          <div className="lg:col-span-6 p-8 sm:p-12 space-y-6 text-left">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono-tag text-xs font-bold uppercase tracking-widest text-wagh-gold bg-wagh-teal/30 px-3 py-1 rounded-full border border-wagh-gold/30">
+                FLAGSHIP FEATURED PRODUCT
+              </span>
+              <span className="font-mono-tag text-xs font-bold uppercase tracking-widest text-emerald-400 bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-500/30">
+                MADE IN INDIA 🇮🇳
+              </span>
+            </div>
 
             <h2 className="font-editorial text-3xl sm:text-4xl md:text-5xl font-extrabold leading-tight text-white">
-              The Super Fast Charger 2.0 — <br />
-              <span className="text-wagh-gold italic">Now in Premium Teal</span>
+              WAGH ALL IN 1 2.0 — <br />
+              <span className="text-wagh-gold italic">66W / 100W Flash Charger</span>
             </h2>
 
             <p className="text-gray-300 text-sm sm:text-base leading-relaxed max-w-xl">
-              Compact power redefined. Delivers continuous 45W Power Delivery in a body 40% smaller than standard wall adapters.
+              Ultra Super VOOC & PPS Smart Fast Charging Technology. Engineered with 100% higher charging efficiency than standard wall adapters.
             </p>
 
-            <div className="pt-2 flex items-center gap-4">
+            {/* Product Specifications from Packaging */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono-tag pt-2 border-t border-gray-800">
+              <div className="bg-slate-800/80 p-3 rounded-xl border border-gray-700/60 space-y-1">
+                <span className="text-wagh-gold font-bold block">⚡ 25W Max Smart Charge</span>
+                <p className="text-gray-400 text-[11px]">Achieves 100% higher charging efficiency with PPS matching.</p>
+              </div>
+              <div className="bg-slate-800/80 p-3 rounded-xl border border-gray-700/60 space-y-1">
+                <span className="text-wagh-gold font-bold block">🌐 Universal Compatibility</span>
+                <p className="text-gray-400 text-[11px]">Powers all Android, iPhone & Type-C devices at max speed.</p>
+              </div>
+              <div className="bg-slate-800/80 p-3 rounded-xl border border-gray-700/60 space-y-1">
+                <span className="text-wagh-gold font-bold block">🛡️ Multi-Protection System</span>
+                <p className="text-gray-400 text-[11px]">Surge protection, short circuit & thermal control guards.</p>
+              </div>
+              <div className="bg-slate-800/80 p-3 rounded-xl border border-gray-700/60 space-y-1">
+                <span className="text-wagh-gold font-bold block">✨ Premium Design</span>
+                <p className="text-gray-400 text-[11px]">High gloss detailing with comfortable ergonomic grip.</p>
+              </div>
+            </div>
+
+            <div className="pt-2 flex flex-wrap items-center gap-4">
               <Link
                 to="/shop?category=chargers-adapters"
-                className="px-8 py-4 rounded-full bg-wagh-gold text-wagh-dark font-extrabold text-sm sm:text-base hover:bg-wagh-gold-light transition-all duration-200 shadow-lg hover:scale-105"
+                className="px-8 py-4 rounded-full bg-wagh-teal text-white font-extrabold text-sm sm:text-base hover:bg-wagh-teal-dark transition-all duration-200 shadow-lg hover:shadow-teal-glow hover:scale-105 flex items-center gap-2"
               >
-                Get Yours — ₹749
+                <span>Shop ALL IN 1 2.0 Now</span>
+                <ChevronRight className="w-5 h-5" />
               </Link>
+              <span className="text-xs font-mono-tag text-gray-400">
+                Model: ALL IN 1 2.0 | Max Output: 66/100W
+              </span>
             </div>
           </div>
 
-          <div className="lg:col-span-5 p-8 flex items-center justify-center bg-gradient-to-t from-wagh-teal/20 to-transparent">
-            <img
-              src="https://images.unsplash.com/photo-1622445268465-843dcb642733?w=800&auto=format&fit=crop&q=80"
-              alt="Flagship Charger"
-              className="w-72 h-72 object-contain drop-shadow-2xl hover:rotate-3 transition-transform duration-500"
-            />
+          <div className="lg:col-span-6 p-6 sm:p-8 flex items-center justify-center bg-gradient-to-br from-wagh-teal/20 via-slate-900 to-slate-950 border-t lg:border-t-0 lg:border-l border-gray-800">
+            <div className="relative group w-full max-w-lg aspect-square flex items-center justify-center">
+              <div className="absolute -inset-2 bg-gradient-to-r from-wagh-teal to-wagh-gold rounded-3xl opacity-25 blur-xl group-hover:opacity-40 transition-opacity" />
+              <img
+                src="/assets/branding/wagh-all-in-one-packaging-banner.jpg"
+                alt="WAGH ALL IN 1 2.0 66W 100W Flash Charger Box Packaging"
+                className="w-full h-full object-contain rounded-2xl shadow-2xl group-hover:scale-105 transition-transform duration-500 relative z-10"
+              />
+            </div>
           </div>
         </div>
       </section>
