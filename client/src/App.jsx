@@ -9,6 +9,7 @@ import { LoginModal } from './components/LoginModal';
 import { Footer } from './components/Footer';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AdminGateway } from './components/AdminGateway';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Pages
 import { Home } from './pages/Home';
@@ -24,6 +25,7 @@ import PaymentReceipt from './pages/PaymentReceipt';
 import PurchaseInvoice from './pages/PurchaseInvoice';
 import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
+import NotFound from './pages/NotFound';
 
 // Context Providers
 import { ToastProvider } from './context/ToastContext';
@@ -32,44 +34,6 @@ import { CartProvider } from './context/CartContext';
 import { WishlistProvider } from './context/WishlistContext';
 
 import ScrollToTop from './components/ScrollToTop';
-
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error('Unhandled Application Error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center space-y-4 font-sans">
-          <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-2xl mx-auto shadow-sm">
-            !
-          </div>
-          <h2 className="text-2xl font-bold text-slate-800">Something went wrong</h2>
-          <p className="text-slate-500 max-w-md text-sm">
-            {this.state.error?.message || 'An unexpected display error occurred. Please refresh the page to continue.'}
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-2.5 rounded-full bg-wagh-teal text-white font-bold text-xs shadow-md hover:bg-wagh-teal-dark transition-all cursor-pointer"
-          >
-            Refresh Page
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 function EmailVerificationBanner() {
   const { user, resendEmailVerification } = useAuth();
@@ -172,6 +136,8 @@ function MainAppLayout() {
               </AdminGateway>
             }
           />
+          {/* Catch-all Wildcard Route for 404 Not Found Page */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
 

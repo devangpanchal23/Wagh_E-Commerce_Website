@@ -103,6 +103,14 @@ const { protect } = require('./middleware/auth');
 app.post('/api/create-order', protect, createRazorpayOrder);
 app.post('/api/verify-payment', protect, verifyRazorpayPayment);
 
+// 404 Catch-All Handler for unmatched API routes
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `API route not found - ${req.method} ${req.originalUrl}`,
+  });
+});
+
 // Global Error Handler
 app.use(errorHandler);
 
