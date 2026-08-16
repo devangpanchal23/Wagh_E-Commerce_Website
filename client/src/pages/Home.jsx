@@ -227,34 +227,34 @@ export function Home() {
           <div className="absolute top-0 right-0 -mt-12 -mr-12 w-96 h-96 bg-wagh-teal/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute bottom-0 left-0 -mb-12 -ml-12 w-96 h-96 bg-wagh-gold/10 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="lg:col-span-6 p-8 sm:p-12 space-y-6 text-left relative z-10">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="font-mono-tag text-xs font-bold uppercase tracking-widest text-wagh-teal bg-wagh-teal/10 px-3.5 py-1.5 rounded-full border border-wagh-teal/20 shadow-2xs">
+          <div className="lg:col-span-6 p-6 sm:p-10 space-y-5 text-left relative z-10">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono-tag text-[11px] font-bold uppercase tracking-wider text-wagh-teal bg-wagh-teal/10 px-3 py-1 rounded-full border border-wagh-teal/20 shadow-2xs">
                 FLAGSHIP FEATURED PRODUCT
               </span>
-              <span className="font-mono-tag text-xs font-bold uppercase tracking-widest text-emerald-800 bg-emerald-100/80 px-3.5 py-1.5 rounded-full border border-emerald-300/80 shadow-2xs">
+              <span className="font-mono-tag text-[11px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100/80 px-3 py-1 rounded-full border border-emerald-300/80 shadow-2xs">
                 MADE IN INDIA 🇮🇳
               </span>
             </div>
 
-            <h2 className="font-editorial text-3xl sm:text-4xl md:text-5xl font-extrabold leading-tight text-wagh-dark tracking-tight">
+            <h2 className="font-editorial text-2xl sm:text-3xl md:text-4xl font-extrabold leading-tight text-wagh-dark tracking-tight">
               WAGH ALL IN 1 2.0 — <br />
-              <span className="text-wagh-teal underline decoration-wagh-gold decoration-4 underline-offset-8">66W / 100W Flash Charger</span>
+              <span className="text-wagh-teal underline decoration-wagh-gold decoration-2 underline-offset-4">66W / 100W Flash Charger</span>
             </h2>
 
-            <p className="text-wagh-dark/80 text-base sm:text-lg leading-relaxed max-w-xl">
+            <p className="text-wagh-dark/75 text-sm sm:text-base leading-relaxed max-w-lg">
               Ultra Super VOOC & PPS Smart Fast Charging Technology. Engineered with 100% higher charging efficiency than standard wall adapters.
             </p>
 
-            <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+            <div className="pt-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
               <Link
                 to="/shop?category=chargers-adapters"
-                className="px-8 py-4 rounded-full bg-wagh-teal text-white font-extrabold text-sm sm:text-base hover:bg-wagh-teal-dark transition-all duration-300 shadow-lg hover:shadow-teal-glow hover:scale-105 flex items-center justify-center gap-2 group cursor-pointer"
+                className="px-6 py-3 rounded-full bg-wagh-teal text-white font-extrabold text-xs sm:text-sm hover:bg-wagh-teal-dark transition-all duration-300 shadow-md hover:shadow-teal-glow hover:scale-105 flex items-center justify-center gap-2 group cursor-pointer"
               >
                 <span>Shop ALL IN 1 2.0 Now</span>
-                <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
-              <div className="text-xs font-mono-tag text-wagh-muted flex items-center gap-2">
+              <div className="text-[11px] font-mono-tag text-wagh-muted flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-wagh-teal animate-pulse" />
                 <span>Model: ALL IN 1 2.0 | Max Output: 66/100W</span>
               </div>
