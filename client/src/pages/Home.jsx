@@ -39,17 +39,17 @@ export function Home() {
           <div className="lg:col-span-7 space-y-6 text-left">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-wagh-teal/10 text-wagh-teal font-mono-tag text-xs font-bold uppercase tracking-widest border border-wagh-teal/20">
               <Zap className="w-4 h-4 text-wagh-gold fill-wagh-gold" />
-              <span>Flagship 45W PPS Super Fast Charger</span>
+              <span>NEW Launching — 100 WATT SUPPORTED</span>
             </div>
 
             <h1 className="font-editorial text-4xl sm:text-5xl lg:text-6xl font-extrabold text-wagh-dark tracking-tight leading-[1.1]">
               Power that feels <span className="text-wagh-teal underline decoration-wagh-gold decoration-4 underline-offset-8">premium.</span>
               <br />
-              Speed you can trust.
+              100W Speed you can trust.
             </h1>
 
             <p className="text-wagh-dark/80 text-base sm:text-lg max-w-2xl leading-relaxed">
-              Experience zero-compromise charging engineered with 45W PPS Super Fast Output, multi-layer heat management, and aerospace-grade braided cables.
+              Experience next-gen charging engineered with WAGH 100 Watt Supported Ultra-Fast Output, multi-layer heat management, and aerospace-grade build quality.
             </p>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-4">
@@ -57,7 +57,7 @@ export function Home() {
                 to="/shop?category=chargers-adapters"
                 className="px-8 py-4 rounded-full bg-wagh-teal text-white font-extrabold text-sm sm:text-base hover:bg-wagh-teal-dark transition-all duration-300 shadow-lg hover:shadow-teal-glow flex items-center justify-center gap-3 group"
               >
-                <span>Shop the 45W Adapter</span>
+                <span>Shop the 100W Adapter</span>
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link
