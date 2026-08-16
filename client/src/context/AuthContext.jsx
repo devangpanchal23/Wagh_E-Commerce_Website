@@ -17,11 +17,14 @@ const normalizeBirthdate = (value) => {
 const mapMongoProfile = (baseProfile, data = {}) => ({
   ...baseProfile,
   email: data.email || baseProfile.email,
+  emailVerified: data.emailVerified !== undefined ? !!data.emailVerified : (baseProfile.emailVerified || false),
+  emailVerifiedAt: data.emailVerifiedAt || null,
   displayName: data.name || baseProfile.displayName,
   name: data.name || baseProfile.displayName,
   phone: data.mobileNumber || data.phone || '',
   phoneNumber: data.mobileNumber || data.phone || '',
   mobileNumber: data.mobileNumber || data.phone || '',
+  phoneVerified: data.phoneVerified !== undefined ? !!data.phoneVerified : (baseProfile.phoneVerified || false),
   birthdate: normalizeBirthdate(data.birthdate),
   age: data.age !== undefined && data.age !== null ? data.age : null,
   gender: data.gender || 'prefer_not_to_say',
@@ -231,14 +234,69 @@ export function AuthProvider({ children }) {
     return Promise.resolve({ success: true });
   };
 
-  const sendPhoneOtp = () => {
-    openSignIn();
-    return Promise.resolve({ success: true });
+  const sendPhoneOtp = async (phoneNum) => {
+    try {
+      const res = await fetchApi('/auth/phone/send-otp', {
+        method: 'POST',
+        getToken,
+        body: JSON.stringify({ phone: phoneNum }),
+      });
+      return res;
+    } catch (err) {
+      return { success: false, message: err.message || 'Failed to send OTP' };
+    }
   };
 
-  const verifyPhoneOtp = () => {
-    openSignIn();
-    return Promise.resolve({ success: true });
+  const verifyPhoneOtp = async (otpCode) => {
+    try {
+      const res = await fetchApi('/auth/phone/verify-otp', {
+        method: 'POST',
+        getToken,
+        body: JSON.stringify({ otp: otpCode }),
+      });
+      if (res && res.success) {
+        setUserProfile((prev) => ({
+          ...prev,
+          phoneVerified: true,
+        }));
+      }
+      return res;
+    } catch (err) {
+      return { success: false, message: err.message || 'Failed to verify OTP' };
+    }
+  };
+
+  const sendEmailOtp = async (targetEmail) => {
+    try {
+      const res = await fetchApi('/auth/email/send-otp', {
+        method: 'POST',
+        getToken,
+        body: JSON.stringify({ email: targetEmail }),
+      });
+      return res;
+    } catch (err) {
+      return { success: false, message: err.message || 'Failed to send OTP email' };
+    }
+  };
+
+  const verifyEmailOtp = async (otpCode) => {
+    try {
+      const res = await fetchApi('/auth/email/verify-otp', {
+        method: 'POST',
+        getToken,
+        body: JSON.stringify({ otp: otpCode }),
+      });
+      if (res && res.success) {
+        setUserProfile((prev) => ({
+          ...prev,
+          emailVerified: true,
+          emailVerifiedAt: res.data?.emailVerifiedAt || new Date().toISOString(),
+        }));
+      }
+      return res;
+    } catch (err) {
+      return { success: false, message: err.message || 'Failed to verify email OTP' };
+    }
   };
 
   const resendEmailVerification = () => {
@@ -263,6 +321,8 @@ export function AuthProvider({ children }) {
         loginWithApple,
         sendPhoneOtp,
         verifyPhoneOtp,
+        sendEmailOtp,
+        verifyEmailOtp,
         logout,
         resendEmailVerification,
         updateUserProfile,

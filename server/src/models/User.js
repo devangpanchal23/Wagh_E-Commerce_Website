@@ -14,6 +14,30 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true,
   },
+  emailVerified: {
+    type: Boolean,
+    default: false,
+  },
+  emailVerifiedAt: {
+    type: Date,
+    default: null,
+  },
+  emailOtpHash: {
+    type: String,
+    default: null,
+  },
+  emailOtpExpiresAt: {
+    type: Date,
+    default: null,
+  },
+  emailOtpAttempts: {
+    type: Number,
+    default: 0,
+  },
+  emailOtpLastSentAt: {
+    type: Date,
+    default: null,
+  },
   password: {
     type: String,
     required: [true, 'Password is required'],
@@ -33,6 +57,26 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true,
     default: '',
+  },
+  phoneVerified: {
+    type: Boolean,
+    default: false,
+  },
+  phoneOtpHash: {
+    type: String,
+    default: null,
+  },
+  phoneOtpExpiresAt: {
+    type: Date,
+    default: null,
+  },
+  phoneOtpAttempts: {
+    type: Number,
+    default: 0,
+  },
+  phoneOtpLastSentAt: {
+    type: Date,
+    default: null,
   },
   age: {
     type: Number,

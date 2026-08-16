@@ -1,6 +1,8 @@
 const User = require('../models/User');
 const Order = require('../models/Order');
 const jwt = require('jsonwebtoken');
+const { sendRealSmsOtp } = require('../utils/smsService');
+const { sendOtpEmail } = require('../utils/sendOtpEmail');
 
 const normalizeBirthdate = (value) => {
   if (!value) return '';
@@ -85,16 +87,26 @@ exports.loginUser = async (req, res, next) => {
   }
 };
 
+// 5 Months Email Verification Expiration (150 days)
+const FIVE_MONTHS_MS = 150 * 24 * 60 * 60 * 1000;
+
+const isEmailVerifiedAndValid = (userDoc) => {
+  if (!userDoc || !userDoc.emailVerified || !userDoc.emailVerifiedAt) return false;
+  const verifiedTime = new Date(userDoc.emailVerifiedAt).getTime();
+  if (isNaN(verifiedTime)) return false;
+  const ageMs = Date.now() - verifiedTime;
+  return ageMs < FIVE_MONTHS_MS;
+};
+
 // @desc    Get user profile
 // @route   GET /api/v1/auth/profile
 exports.getUserProfile = async (req, res, next) => {
   try {
-    const user = req.user;
+    const user = await User.findById(req.user._id).lean();
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Dynamic age calculation from birthdate if provided
     let computedAge = user.age;
     if (user.birthdate) {
       const dob = new Date(user.birthdate);
@@ -106,9 +118,6 @@ exports.getUserProfile = async (req, res, next) => {
           calc--;
         }
         computedAge = calc >= 0 ? calc : 0;
-        if (user.age !== computedAge) {
-          User.updateOne({ _id: user._id }, { age: computedAge }).catch(() => {});
-        }
       }
     }
 
@@ -119,8 +128,11 @@ exports.getUserProfile = async (req, res, next) => {
         clerkId: user.clerkId || '',
         name: user.name,
         email: user.email,
+        emailVerified: isEmailVerifiedAndValid(user),
+        emailVerifiedAt: user.emailVerifiedAt || null,
         mobileNumber: user.mobileNumber || '',
         phone: user.mobileNumber || '',
+        phoneVerified: !!user.phoneVerified,
         birthdate: normalizeBirthdate(user.birthdate),
         age: computedAge !== undefined && computedAge !== null ? computedAge : null,
         gender: user.gender || 'prefer_not_to_say',
@@ -150,8 +162,13 @@ exports.updateUserProfile = async (req, res, next) => {
     const targetPhone = mobileNumber !== undefined ? mobileNumber : phone;
 
     // Validate name if provided
-    if (name !== undefined && name !== null && !name.trim()) {
-      errors.name = 'Name cannot be empty';
+    if (name !== undefined && name !== null && name.trim() !== '') {
+      const cleanName = name.trim();
+      if (cleanName.length < 2 || cleanName.length > 60) {
+        errors.name = 'Name must be between 2 and 60 characters';
+      } else if (!/^[a-zA-Z\s'’\-]+$/.test(cleanName)) {
+        errors.name = 'Name can only contain letters, spaces, apostrophes, and hyphens';
+      }
     }
 
     // Validate email if changed
@@ -172,10 +189,10 @@ exports.updateUserProfile = async (req, res, next) => {
 
     // Validate mobileNumber / phone if provided
     if (targetPhone !== undefined && targetPhone !== null && targetPhone.trim() !== '') {
-      const cleanMobile = targetPhone.trim();
-      const mobileRegex = /^\d{10}$/;
+      const cleanMobile = targetPhone.trim().replace(/\D/g, '');
+      const mobileRegex = /^[6-9]\d{9}$/;
       if (!mobileRegex.test(cleanMobile)) {
-        errors.mobileNumber = 'Mobile number must be a 10-digit phone number';
+        errors.mobileNumber = 'Mobile number must be a valid 10-digit Indian mobile number starting with 6-9';
       }
     }
 
@@ -194,16 +211,16 @@ exports.updateUserProfile = async (req, res, next) => {
         if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
           calc--;
         }
-        if (calc < 13 || calc > 100) {
-          errors.birthdate = 'Age must be between 13 and 100 years';
+        if (calc < 13 || calc > 120) {
+          errors.birthdate = 'Age derived from birthdate must be between 13 and 120 years';
         } else {
           computedAge = calc;
         }
       }
     } else if (age !== undefined && age !== null && age !== '') {
       const parsedAge = Number(age);
-      if (isNaN(parsedAge) || !Number.isInteger(parsedAge) || parsedAge < 13 || parsedAge > 100) {
-        errors.age = 'Age must be an integer between 13 and 100';
+      if (isNaN(parsedAge) || !Number.isInteger(parsedAge) || parsedAge < 13 || parsedAge > 120) {
+        errors.age = 'Age must be an integer between 13 and 120';
       } else {
         computedAge = parsedAge;
       }
@@ -233,10 +250,18 @@ exports.updateUserProfile = async (req, res, next) => {
       const emailLower = email.trim().toLowerCase();
       if (emailLower !== existingUser.email) {
         updateFields.email = emailLower;
+        updateFields.emailVerified = false; // reset verification status when email is changed
+        updateFields.emailVerifiedAt = null;
         tokenRefreshed = generateToken(userId, existingUser.role);
       }
     }
-    if (targetPhone !== undefined) updateFields.mobileNumber = targetPhone.trim();
+    if (targetPhone !== undefined) {
+      const cleanMobile = targetPhone.trim().replace(/\D/g, '');
+      updateFields.mobileNumber = cleanMobile;
+      if (cleanMobile !== (existingUser.mobileNumber || '')) {
+        updateFields.phoneVerified = false;
+      }
+    }
     if (birthdate !== undefined) updateFields.birthdate = birthdate;
     if (computedAge !== undefined) updateFields.age = computedAge === '' || computedAge === null ? null : Number(computedAge);
     if (gender !== undefined) updateFields.gender = gender;
@@ -246,7 +271,7 @@ exports.updateUserProfile = async (req, res, next) => {
       userId,
       { $set: updateFields },
       { new: true, runValidators: false }
-    ).select('_id clerkId name email mobileNumber birthdate age gender addresses role').lean();
+    ).select('_id clerkId name email emailVerified emailVerifiedAt mobileNumber phoneVerified birthdate age gender addresses role').lean();
 
     res.json({
       success: true,
@@ -255,8 +280,11 @@ exports.updateUserProfile = async (req, res, next) => {
         clerkId: updatedUser.clerkId || '',
         name: updatedUser.name,
         email: updatedUser.email,
+        emailVerified: isEmailVerifiedAndValid(updatedUser),
+        emailVerifiedAt: updatedUser.emailVerifiedAt || null,
         mobileNumber: updatedUser.mobileNumber || '',
         phone: updatedUser.mobileNumber || '',
+        phoneVerified: !!updatedUser.phoneVerified,
         birthdate: normalizeBirthdate(updatedUser.birthdate),
         age: updatedUser.age !== undefined && updatedUser.age !== null ? updatedUser.age : null,
         gender: updatedUser.gender || 'prefer_not_to_say',
@@ -265,6 +293,256 @@ exports.updateUserProfile = async (req, res, next) => {
         ...(tokenRefreshed ? { token: tokenRefreshed } : {}),
       },
       message: 'Profile updated successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Send OTP to user's mobile number for verification
+// @route   POST /api/v1/auth/phone/send-otp
+exports.sendPhoneOtp = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const requestedPhone = req.body.phone || req.body.mobileNumber || user.mobileNumber;
+    const cleanPhone = (requestedPhone || '').replace(/\D/g, '');
+
+    if (!cleanPhone || !/^[6-9]\d{9}$/.test(cleanPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid 10-digit Indian mobile number starting with 6-9',
+      });
+    }
+
+    // Rate limiting: max 3 requests per 10 minutes
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    if (user.phoneOtpLastSentAt && user.phoneOtpLastSentAt > tenMinutesAgo && user.phoneOtpAttempts >= 3) {
+      return res.status(429).json({
+        success: false,
+        message: 'Too many OTP requests. Please wait 10 minutes before requesting a new code.',
+      });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const bcrypt = require('bcryptjs');
+    const otpHash = await bcrypt.hash(otp, 10);
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+    // Update user document
+    user.mobileNumber = cleanPhone;
+    user.phoneOtpHash = otpHash;
+    user.phoneOtpExpiresAt = expiresAt;
+    user.phoneOtpAttempts = 0;
+    user.phoneOtpLastSentAt = new Date();
+
+    await user.save();
+
+    // Trigger real SMS dispatch via SMS Gateway (Fast2SMS / Twilio / MSG91)
+    const smsResult = await sendRealSmsOtp(cleanPhone, otp);
+
+    res.json({
+      success: true,
+      message: smsResult.success
+        ? `Verification code sent via ${smsResult.provider} SMS to +91 ${cleanPhone}`
+        : `Verification code generated for +91 ${cleanPhone}`,
+      smsDelivered: smsResult.success,
+      // Provide devOtp hint if SMS gateway API key is not configured in server/.env
+      ...(!smsResult.success ? { devOtp: otp, note: 'Set FAST2SMS_API_KEY or TWILIO_ACCOUNT_SID in server/.env for live mobile SMS' } : {}),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Verify OTP for user's mobile number
+// @route   POST /api/v1/auth/phone/verify-otp
+exports.verifyPhoneOtp = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const { otp } = req.body;
+    if (!otp || typeof otp !== 'string' || otp.trim().length !== 6) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid 6-digit OTP code' });
+    }
+
+    if (!user.phoneOtpHash || !user.phoneOtpExpiresAt) {
+      return res.status(400).json({ success: false, message: 'No OTP requested or OTP has expired. Please request a new OTP.' });
+    }
+
+    if (new Date() > new Date(user.phoneOtpExpiresAt)) {
+      user.phoneOtpHash = null;
+      user.phoneOtpExpiresAt = null;
+      await user.save();
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new OTP.' });
+    }
+
+    if (user.phoneOtpAttempts >= 5) {
+      user.phoneOtpHash = null;
+      user.phoneOtpExpiresAt = null;
+      await user.save();
+      return res.status(429).json({ success: false, message: 'Maximum OTP verification attempts exceeded. Please request a fresh OTP.' });
+    }
+
+    const bcrypt = require('bcryptjs');
+    const isMatch = await bcrypt.compare(otp.trim(), user.phoneOtpHash);
+
+    if (!isMatch) {
+      user.phoneOtpAttempts = (user.phoneOtpAttempts || 0) + 1;
+      await user.save();
+      const remainingAttempts = 5 - user.phoneOtpAttempts;
+      return res.status(400).json({
+        success: false,
+        message: `Incorrect OTP code. ${remainingAttempts} attempt(s) remaining before lock.`,
+      });
+    }
+
+    // Success: mark phone as verified and clear OTP state
+    user.phoneVerified = true;
+    user.phoneOtpHash = null;
+    user.phoneOtpExpiresAt = null;
+    user.phoneOtpAttempts = 0;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      data: {
+        phoneVerified: true,
+        mobileNumber: user.mobileNumber,
+      },
+      message: 'Mobile number verified successfully!',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Send OTP to user's email for verification via Resend SMTP
+// @route   POST /api/v1/auth/email/send-otp
+exports.sendEmailOtp = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const requestedEmail = req.body.email || user.email;
+    const cleanEmail = (requestedEmail || '').trim().toLowerCase();
+
+    if (!cleanEmail || !/^\S+@\S+\.\S+$/.test(cleanEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email address',
+      });
+    }
+
+    // Rate limiting: max 3 requests per 10 minutes
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    if (user.emailOtpLastSentAt && user.emailOtpLastSentAt > tenMinutesAgo && user.emailOtpAttempts >= 3) {
+      return res.status(429).json({
+        success: false,
+        message: 'Too many OTP requests. Please wait 10 minutes before requesting a new code.',
+      });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const bcrypt = require('bcryptjs');
+    const otpHash = await bcrypt.hash(otp, 10);
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+    // Update user document
+    user.email = cleanEmail;
+    user.emailOtpHash = otpHash;
+    user.emailOtpExpiresAt = expiresAt;
+    user.emailOtpAttempts = 0;
+    user.emailOtpLastSentAt = new Date();
+
+    await user.save();
+
+    // Trigger real email dispatch via Resend directly to recipient
+    const sendResult = await sendOtpEmail(cleanEmail, otp);
+
+    res.json({
+      success: true,
+      message: `Verification OTP sent to email ${cleanEmail}`,
+      ...(sendResult?.devOtp ? { devOtp: sendResult.devOtp } : {}),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Verify OTP for user's email address
+// @route   POST /api/v1/auth/email/verify-otp
+exports.verifyEmailOtp = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const { otp } = req.body;
+    if (!otp || typeof otp !== 'string' || otp.trim().length !== 6) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid 6-digit OTP code' });
+    }
+
+    if (!user.emailOtpHash || !user.emailOtpExpiresAt) {
+      return res.status(400).json({ success: false, message: 'No OTP requested or OTP has expired. Please request a new OTP.' });
+    }
+
+    if (new Date() > new Date(user.emailOtpExpiresAt)) {
+      user.emailOtpHash = null;
+      user.emailOtpExpiresAt = null;
+      await user.save();
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new OTP.' });
+    }
+
+    if (user.emailOtpAttempts >= 5) {
+      user.emailOtpHash = null;
+      user.emailOtpExpiresAt = null;
+      await user.save();
+      return res.status(429).json({ success: false, message: 'Maximum OTP verification attempts exceeded. Please request a fresh OTP.' });
+    }
+
+    const bcrypt = require('bcryptjs');
+    const isMatch = await bcrypt.compare(otp.trim(), user.emailOtpHash);
+
+    if (!isMatch) {
+      user.emailOtpAttempts = (user.emailOtpAttempts || 0) + 1;
+      await user.save();
+      const remainingAttempts = 5 - user.emailOtpAttempts;
+      return res.status(400).json({
+        success: false,
+        message: `Incorrect OTP code. ${remainingAttempts} attempt(s) remaining before lock.`,
+      });
+    }
+
+    // Success: mark email as verified with timestamp (valid for 5 months)
+    user.emailVerified = true;
+    user.emailVerifiedAt = new Date();
+    user.emailOtpHash = null;
+    user.emailOtpExpiresAt = null;
+    user.emailOtpAttempts = 0;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      data: {
+        emailVerified: true,
+        emailVerifiedAt: user.emailVerifiedAt,
+        email: user.email,
+      },
+      message: 'Email address verified successfully!',
     });
   } catch (error) {
     next(error);

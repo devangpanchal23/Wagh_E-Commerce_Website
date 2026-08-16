@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MapPin, Plus, Edit2, Trash2, CheckCircle, Home, Briefcase, Star, X, AlertCircle } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { addressSchema, sanitizeText } from '../../validations/profileSchema';
 
 export function AddressBook({ addresses = [], onSaveAddresses }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -57,24 +58,26 @@ export function AddressBook({ addresses = [], onSaveAddresses }) {
   };
 
   const validate = () => {
-    const errs = {};
-    if (!formData.label.trim()) errs.label = 'Label is required (e.g. Home, Work)';
-    if (!formData.line1.trim()) errs.line1 = 'Address Line 1 is required';
-    if (!formData.city.trim()) errs.city = 'City is required';
-    if (!formData.state.trim()) errs.state = 'State is required';
-    if (!formData.pincode.trim()) {
-      errs.pincode = 'Pincode is required';
-    } else if (!/^\d{6}$/.test(formData.pincode.trim())) {
-      errs.pincode = 'Pincode must be 6 digits';
+    const parseResult = addressSchema.safeParse(formData);
+    if (!parseResult.success) {
+      const errs = {};
+      parseResult.error.issues.forEach((issue) => {
+        const fieldName = issue.path[0];
+        if (!errs[fieldName]) {
+          errs[fieldName] = issue.message;
+        }
+      });
+      setErrors(errs);
+      return false;
     }
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
+    setErrors({});
+    return true;
   };
 
   const handleSaveAddress = async (e) => {
     e.preventDefault();
     if (!validate()) {
-      addToast('Please fill out all required address fields.', 'error');
+      addToast('Please fill out all required address fields correctly.', 'error');
       return;
     }
 
@@ -85,12 +88,12 @@ export function AddressBook({ addresses = [], onSaveAddresses }) {
 
     const newAddressObj = {
       id: addressId,
-      label: formData.label.trim(),
-      line1: formData.line1.trim(),
-      line2: formData.line2.trim(),
-      city: formData.city.trim(),
-      state: formData.state.trim(),
-      pincode: formData.pincode.trim(),
+      label: sanitizeText(formData.label),
+      line1: sanitizeText(formData.line1),
+      line2: sanitizeText(formData.line2),
+      city: sanitizeText(formData.city),
+      state: sanitizeText(formData.state),
+      pincode: formData.pincode.replace(/\D/g, ''),
       isDefault: formData.isDefault || addresses.length === 0,
     };
 

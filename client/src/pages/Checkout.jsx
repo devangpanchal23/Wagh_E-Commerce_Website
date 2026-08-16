@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchApi } from '../api';
 import { ProductImage } from '../components/ProductImage';
+import { checkoutShippingAddressSchema, sanitizeText } from '../validations/profileSchema';
 
 export function Checkout() {
   const { cartItems, subtotal, shippingFee, grandTotal, clearCart } = useCart();
@@ -24,6 +25,7 @@ export function Checkout() {
     pincode: '',
   });
 
+  const [fieldErrors, setFieldErrors] = useState({});
   const [savedAddrData, setSavedAddrData] = useState(null);
   const [savedAddressesList, setSavedAddressesList] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
@@ -66,14 +68,15 @@ export function Checkout() {
 
     setAddress({
       name: item.fullName || user?.name || '',
-      phone: item.mobileNumber || '',
+      phone: String(item.mobileNumber || '').replace(/\D/g, ''),
       line1: l1,
       line2: l2,
       street: fullStreet,
       city: item.city || '',
       state: item.state || '',
-      pincode: item.pincode || '',
+      pincode: String(item.pincode || '').replace(/\D/g, ''),
     });
+    setFieldErrors({});
     setSelectedAddressId(item.id);
     setUsedSavedAddr(true);
     addToast(`Selected "${item.label || 'Saved Address'}"!`, 'success');
@@ -87,14 +90,15 @@ export function Checkout() {
 
       setAddress({
         name: savedAddrData.fullName || user?.name || '',
-        phone: savedAddrData.mobileNumber || '',
+        phone: String(savedAddrData.mobileNumber || '').replace(/\D/g, ''),
         line1: l1,
         line2: l2,
         street: fullStreet,
         city: savedAddrData.city || '',
         state: savedAddrData.state || '',
-        pincode: savedAddrData.pincode || '',
+        pincode: String(savedAddrData.pincode || '').replace(/\D/g, ''),
       });
+      setFieldErrors({});
       setUsedSavedAddr(true);
       addToast('Saved address details autofilled!', 'success');
     }
@@ -155,6 +159,20 @@ export function Checkout() {
       navigate('/profile');
       return;
     }
+
+    // Validate shipping address against Zod schema
+    const parseResult = checkoutShippingAddressSchema.safeParse(address);
+    if (!parseResult.success) {
+      const errs = {};
+      parseResult.error.issues.forEach((issue) => {
+        const field = issue.path[0];
+        if (!errs[field]) errs[field] = issue.message;
+      });
+      setFieldErrors(errs);
+      addToast('Please fix shipping address validation errors before placing order', 'error');
+      return;
+    }
+    setFieldErrors({});
 
     setIsSubmitting(true);
     try {
@@ -536,30 +554,59 @@ export function Checkout() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm font-medium">
               <div>
-                <label className="block text-xs font-mono-tag text-wagh-muted mb-1">Full Name</label>
+                <label className="block text-xs font-mono-tag text-wagh-muted mb-1">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={address.name}
-                  onChange={(e) => setAddress({ ...address, name: e.target.value })}
-                  className="w-full p-2.5 rounded-xl border border-wagh-border focus:outline-none focus:ring-2 focus:ring-wagh-teal"
+                  onChange={(e) => {
+                    setAddress({ ...address, name: e.target.value });
+                    if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: null }));
+                  }}
+                  className={`w-full p-2.5 rounded-xl border transition-all focus:outline-none focus:ring-2 ${
+                    fieldErrors.name
+                      ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20'
+                      : 'border-wagh-border focus:ring-wagh-teal'
+                  }`}
                 />
+                {fieldErrors.name && (
+                  <p className="text-xs text-red-500 mt-1 font-mono-tag">{fieldErrors.name}</p>
+                )}
               </div>
 
               <div>
-                <label className="block text-xs font-mono-tag text-wagh-muted mb-1">Phone Number</label>
+                <label className="block text-xs font-mono-tag text-wagh-muted mb-1">
+                  Phone Number (10 Digits) <span className="text-red-500">*</span>
+                </label>
                 <input
-                  type="text"
+                  type="tel"
+                  maxLength={10}
                   required
+                  placeholder="10-digit mobile number"
                   value={address.phone}
-                  onChange={(e) => setAddress({ ...address, phone: e.target.value })}
-                  className="w-full p-2.5 rounded-xl border border-wagh-border focus:outline-none focus:ring-2 focus:ring-wagh-teal"
+                  onChange={(e) => {
+                    const cleanVal = e.target.value.replace(/\D/g, '');
+                    setAddress({ ...address, phone: cleanVal });
+                    if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: null }));
+                  }}
+                  className={`w-full p-2.5 rounded-xl border text-sm font-mono-tag transition-all focus:outline-none focus:ring-2 ${
+                    fieldErrors.phone
+                      ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20'
+                      : 'border-wagh-border focus:ring-wagh-teal'
+                  }`}
                 />
+                {fieldErrors.phone && (
+                  <p className="text-xs text-red-500 mt-1 font-mono-tag">{fieldErrors.phone}</p>
+                )}
               </div>
 
               <div className="sm:col-span-2 space-y-3">
                 <div>
-                  <label className="block text-xs font-mono-tag text-wagh-muted mb-1">Address Line 1 (Flat, House No, Building) *</label>
+                  <label className="block text-xs font-mono-tag text-wagh-muted mb-1">
+                    Address Line 1 (Flat, House No, Building) <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     required
@@ -569,13 +616,23 @@ export function Checkout() {
                       const newL1 = e.target.value;
                       const fullSt = address.line2 ? `${newL1}, ${address.line2}` : newL1;
                       setAddress({ ...address, line1: newL1, street: fullSt });
+                      if (fieldErrors.line1) setFieldErrors((prev) => ({ ...prev, line1: null }));
                     }}
-                    className="w-full p-2.5 rounded-xl border border-wagh-border focus:outline-none focus:ring-2 focus:ring-wagh-teal"
+                    className={`w-full p-2.5 rounded-xl border transition-all focus:outline-none focus:ring-2 ${
+                      fieldErrors.line1
+                        ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20'
+                        : 'border-wagh-border focus:ring-wagh-teal'
+                    }`}
                   />
+                  {fieldErrors.line1 && (
+                    <p className="text-xs text-red-500 mt-1 font-mono-tag">{fieldErrors.line1}</p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono-tag text-wagh-muted mb-1">Address Line 2 (Street, Area, Landmark)</label>
+                  <label className="block text-xs font-mono-tag text-wagh-muted mb-1">
+                    Address Line 2 (Street, Area, Landmark)
+                  </label>
                   <input
                     type="text"
                     placeholder="e.g. Near SG Highway, Opp. City Mall"
@@ -584,40 +641,90 @@ export function Checkout() {
                       const newL2 = e.target.value;
                       const fullSt = newL2 ? `${address.line1}, ${newL2}` : address.line1;
                       setAddress({ ...address, line2: newL2, street: fullSt });
+                      if (fieldErrors.line2) setFieldErrors((prev) => ({ ...prev, line2: null }));
                     }}
-                    className="w-full p-2.5 rounded-xl border border-wagh-border focus:outline-none focus:ring-2 focus:ring-wagh-teal"
+                    className={`w-full p-2.5 rounded-xl border transition-all focus:outline-none focus:ring-2 ${
+                      fieldErrors.line2
+                        ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20'
+                        : 'border-wagh-border focus:ring-wagh-teal'
+                    }`}
                   />
+                  {fieldErrors.line2 && (
+                    <p className="text-xs text-red-500 mt-1 font-mono-tag">{fieldErrors.line2}</p>
+                  )}
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-mono-tag text-wagh-muted mb-1">City</label>
+                <label className="block text-xs font-mono-tag text-wagh-muted mb-1">
+                  City <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={address.city}
-                  onChange={(e) => setAddress({ ...address, city: e.target.value })}
-                  className="w-full p-2.5 rounded-xl border border-wagh-border focus:outline-none focus:ring-2 focus:ring-wagh-teal"
+                  onChange={(e) => {
+                    setAddress({ ...address, city: e.target.value });
+                    if (fieldErrors.city) setFieldErrors((prev) => ({ ...prev, city: null }));
+                  }}
+                  className={`w-full p-2.5 rounded-xl border transition-all focus:outline-none focus:ring-2 ${
+                    fieldErrors.city
+                      ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20'
+                      : 'border-wagh-border focus:ring-wagh-teal'
+                  }`}
                 />
+                {fieldErrors.city && (
+                  <p className="text-xs text-red-500 mt-1 font-mono-tag">{fieldErrors.city}</p>
+                )}
               </div>
 
               <div>
-                <label className="block text-xs font-mono-tag text-wagh-muted mb-1">State & Pincode</label>
+                <label className="block text-xs font-mono-tag text-wagh-muted mb-1">
+                  State & Pincode (6 Digits) <span className="text-red-500">*</span>
+                </label>
                 <div className="flex gap-2">
-                  <input
-                    type="text"
-                    required
-                    value={address.state}
-                    onChange={(e) => setAddress({ ...address, state: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border border-wagh-border focus:outline-none focus:ring-2 focus:ring-wagh-teal"
-                  />
-                  <input
-                    type="text"
-                    required
-                    value={address.pincode}
-                    onChange={(e) => setAddress({ ...address, pincode: e.target.value })}
-                    className="w-28 p-2.5 rounded-xl border border-wagh-border font-mono-tag focus:outline-none focus:ring-2 focus:ring-wagh-teal"
-                  />
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      required
+                      placeholder="State"
+                      value={address.state}
+                      onChange={(e) => {
+                        setAddress({ ...address, state: e.target.value });
+                        if (fieldErrors.state) setFieldErrors((prev) => ({ ...prev, state: null }));
+                      }}
+                      className={`w-full p-2.5 rounded-xl border transition-all focus:outline-none focus:ring-2 ${
+                        fieldErrors.state
+                          ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20'
+                          : 'border-wagh-border focus:ring-wagh-teal'
+                      }`}
+                    />
+                    {fieldErrors.state && (
+                      <p className="text-xs text-red-500 mt-1 font-mono-tag">{fieldErrors.state}</p>
+                    )}
+                  </div>
+                  <div className="w-32">
+                    <input
+                      type="text"
+                      maxLength={6}
+                      required
+                      placeholder="380015"
+                      value={address.pincode}
+                      onChange={(e) => {
+                        const cleanPincode = e.target.value.replace(/\D/g, '');
+                        setAddress({ ...address, pincode: cleanPincode });
+                        if (fieldErrors.pincode) setFieldErrors((prev) => ({ ...prev, pincode: null }));
+                      }}
+                      className={`w-full p-2.5 rounded-xl border font-mono-tag transition-all focus:outline-none focus:ring-2 ${
+                        fieldErrors.pincode
+                          ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20'
+                          : 'border-wagh-border focus:ring-wagh-teal'
+                      }`}
+                    />
+                    {fieldErrors.pincode && (
+                      <p className="text-xs text-red-500 mt-1 font-mono-tag">{fieldErrors.pincode}</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
