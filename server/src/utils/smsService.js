@@ -6,13 +6,13 @@ const https = require('https');
  */
 exports.sendRealSmsOtp = async (mobileNumber, otpCode) => {
   const cleanNumber = String(mobileNumber).replace(/\D/g, '');
-  
+
   // 1. Fast2SMS Integration (Popular Indian SMS Gateway)
   if (process.env.FAST2SMS_API_KEY) {
     try {
       const apiKey = process.env.FAST2SMS_API_KEY;
       const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${encodeURIComponent(apiKey)}&route=otp&variables_values=${encodeURIComponent(otpCode)}&numbers=${encodeURIComponent(cleanNumber)}`;
-      
+
       const response = await fetchUrl(url);
       console.log(`[REAL SMS - FAST2SMS] Sent to +91${cleanNumber}:`, response);
       return { success: true, provider: 'Fast2SMS', details: response };
@@ -28,7 +28,7 @@ exports.sendRealSmsOtp = async (mobileNumber, otpCode) => {
       const authToken = process.env.TWILIO_AUTH_TOKEN;
       const fromNumber = process.env.TWILIO_PHONE_NUMBER;
       const toNumber = cleanNumber.startsWith('+') ? cleanNumber : `+91${cleanNumber}`;
-      
+
       const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
       const postData = new URLSearchParams({
         To: toNumber,

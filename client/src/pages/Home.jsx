@@ -241,25 +241,7 @@ export function Home() {
               Ultra Super VOOC & PPS Smart Fast Charging Technology. Engineered with 100% higher charging efficiency than standard wall adapters.
             </p>
 
-            {/* Product Specifications from Packaging */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono-tag pt-2 border-t border-gray-800">
-              <div className="bg-slate-800/80 p-3 rounded-xl border border-gray-700/60 space-y-1">
-                <span className="text-wagh-gold font-bold block">⚡ 25W Max Smart Charge</span>
-                <p className="text-gray-400 text-[11px]">Achieves 100% higher charging efficiency with PPS matching.</p>
-              </div>
-              <div className="bg-slate-800/80 p-3 rounded-xl border border-gray-700/60 space-y-1">
-                <span className="text-wagh-gold font-bold block">🌐 Universal Compatibility</span>
-                <p className="text-gray-400 text-[11px]">Powers all Android, iPhone & Type-C devices at max speed.</p>
-              </div>
-              <div className="bg-slate-800/80 p-3 rounded-xl border border-gray-700/60 space-y-1">
-                <span className="text-wagh-gold font-bold block">🛡️ Multi-Protection System</span>
-                <p className="text-gray-400 text-[11px]">Surge protection, short circuit & thermal control guards.</p>
-              </div>
-              <div className="bg-slate-800/80 p-3 rounded-xl border border-gray-700/60 space-y-1">
-                <span className="text-wagh-gold font-bold block">✨ Premium Design</span>
-                <p className="text-gray-400 text-[11px]">High gloss detailing with comfortable ergonomic grip.</p>
-              </div>
-            </div>
+
 
             <div className="pt-2 flex flex-wrap items-center gap-4">
               <Link
