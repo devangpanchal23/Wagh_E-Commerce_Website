@@ -43,31 +43,26 @@ export function LoginModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  // Intercept click on Clerk footer action links (e.g. "Already have an account? Sign in")
+  // Clerk renders its "Already have an account? Sign in" switcher inside the
+  // footer action row, and that link is the ONLY control this modal takes over.
+  // Matching every descendant button by its label instead used to preventDefault
+  // the click on Clerk's own submit and "Sign in with Google" buttons — the form
+  // never submitted and OAuth never started, so signing in did nothing at all.
   const handleModalContentClick = (e) => {
-    const linkOrBtn = e.target.closest('a, button');
-    if (!linkOrBtn) return;
+    const target = e.target instanceof Element ? e.target : null;
+    if (!target) return;
 
-    const text = (linkOrBtn.textContent || '').trim().toLowerCase();
-    const href = linkOrBtn.getAttribute('href') || '';
+    const switcher = target.closest('.cl-footerActionLink, .cl-footerAction a, .cl-footerAction button');
+    if (!switcher) return;
 
-    if (
-      href === '#sign-in' ||
-      href.includes('sign-in') ||
-      text === 'sign in' ||
-      text.includes('sign in')
-    ) {
-      e.preventDefault();
-      setAuthMode('sign-in');
-    } else if (
-      href === '#sign-up' ||
-      href.includes('sign-up') ||
-      text === 'sign up' ||
-      text.includes('sign up')
-    ) {
-      e.preventDefault();
-      setAuthMode('sign-up');
-    }
+    const href = switcher.getAttribute('href') || '';
+    const text = (switcher.textContent || '').trim().toLowerCase();
+    const wantsSignUp = href.includes('sign-up') || text.includes('sign up');
+    const wantsSignIn = href.includes('sign-in') || text.includes('sign in');
+    if (!wantsSignUp && !wantsSignIn) return;
+
+    e.preventDefault();
+    setAuthMode(wantsSignUp ? 'sign-up' : 'sign-in');
   };
 
   return (

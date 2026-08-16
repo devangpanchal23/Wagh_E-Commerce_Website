@@ -1,7 +1,16 @@
 const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Built on demand, never at import time: the Resend constructor throws when no
+// API key is set, and this module sits on the require chain behind
+// authController -> authRoutes -> server.js. Constructing it eagerly took the
+// entire API process down at boot whenever RESEND_API_KEY was absent.
+let resendClient = null;
+const getResend = () => {
+  if (!process.env.RESEND_API_KEY) return null;
+  if (!resendClient) resendClient = new Resend(process.env.RESEND_API_KEY);
+  return resendClient;
+};
 
 /**
  * Delivers 6-digit OTP verification email to target recipient.
@@ -54,6 +63,19 @@ async function sendOtpEmail(toEmail, otp) {
   }
 
   // 2. Fallback to Resend API
+  const resend = getResend();
+  if (!resend) {
+    console.warn(
+      `[EMAIL OTP NOT DELIVERED] No email provider configured for ${cleanEmail}. ` +
+        'Set SMTP_USER & SMTP_PASS (preferred) or RESEND_API_KEY in server/.env.'
+    );
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Email delivery is not configured. Please contact support.');
+    }
+    console.log(`[EMAIL OTP GENERATED] Verification OTP for ${cleanEmail} is: ${otp}`);
+    return { success: true, delivered: false, devOtp: otp, provider: 'none' };
+  }
+
   try {
     const { data, error } = await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL || 'Wagh Mobile Accessories <onboarding@resend.dev>',

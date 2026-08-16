@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useUser, useClerk, useAuth as useClerkAuth } from '@clerk/react';
 import { useToast } from './ToastContext';
 import { fetchApi } from '../api';
@@ -37,7 +37,10 @@ export function AuthProvider({ children }) {
   const { signOut: clerkSignOut, openSignIn, openSignUp } = useClerk();
   const { getToken } = useClerkAuth();
   const { addToast } = useToast();
-  const [userProfile, setUserProfile] = useState(null);
+  // Backend enrichment only — never the source of truth for "is this user signed
+  // in". Keyed by uid so a late response for a previous account can never bleed
+  // into the next one.
+  const [mongoProfile, setMongoProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState(null);
   const profileRequestRef = useRef(0);
@@ -66,13 +69,30 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  // Identity comes straight from Clerk, so `user` is populated on the very first
+  // render after Clerk resolves the session. Deriving it from the /auth/profile
+  // round-trip instead is what used to leave `user` null for a render and bounce
+  // freshly signed-in customers straight back out of every protected page.
+  const userProfile = useMemo(() => {
+    if (!isLoaded || !isSignedIn || !clerkUser) return null;
+    const base = buildBaseProfile(clerkUser);
+    if (mongoProfile && mongoProfile.uid === clerkUser.id) {
+      return mapMongoProfile(base, mongoProfile.data);
+    }
+    return base;
+  }, [isLoaded, isSignedIn, clerkUser, buildBaseProfile, mongoProfile]);
+
+  const patchMongoProfile = useCallback((patch) => {
+    setMongoProfile((prev) => (prev ? { ...prev, data: { ...prev.data, ...patch } } : prev));
+  }, []);
+
   const loadMongoProfile = useCallback(
-    async (baseProfile, requestId) => {
+    async (requestId) => {
       const res = await fetchApi('/auth/profile', { getToken });
       if (requestId !== profileRequestRef.current) return null;
-      if (!res?.success || !res.data) return mapMongoProfile(baseProfile, {});
-
-      return mapMongoProfile(baseProfile, res.data);
+      // A failed lookup still resolves the profile — the customer stays signed in
+      // on their Clerk identity rather than being locked out by a backend blip.
+      return res?.success && res.data ? res.data : {};
     },
     [getToken]
   );
@@ -87,13 +107,13 @@ export function AuthProvider({ children }) {
     localStorage.setItem('wagh_clerk_name', baseProfile.displayName);
 
     try {
-      const profile = await loadMongoProfile(baseProfile, requestId);
-      if (profile && requestId === profileRequestRef.current) {
-        setUserProfile(profile);
+      const data = await loadMongoProfile(requestId);
+      if (data && requestId === profileRequestRef.current) {
+        setMongoProfile({ uid: clerkUser.id, data });
         setProfileError(null);
         loadedUidRef.current = baseProfile.uid;
       }
-      return { success: true, data: profile };
+      return { success: true, data };
     } catch (err) {
       if (requestId === profileRequestRef.current) {
         setProfileError(err.message || 'Failed to load your profile data.');
@@ -108,7 +128,7 @@ export function AuthProvider({ children }) {
     if (!isSignedIn || !clerkUser) {
       profileRequestRef.current += 1;
       loadedUidRef.current = null;
-      setUserProfile(null);
+      setMongoProfile(null);
       setProfileLoading(false);
       setProfileError(null);
       localStorage.removeItem('wagh_token');
@@ -121,15 +141,11 @@ export function AuthProvider({ children }) {
     const uid = clerkUser.id;
     const baseProfile = buildBaseProfile(clerkUser);
     const requestId = ++profileRequestRef.current;
-    const isSameUser = loadedUidRef.current === uid;
 
     localStorage.setItem('wagh_clerk_uid', uid);
     localStorage.setItem('wagh_clerk_email', baseProfile.email);
     localStorage.setItem('wagh_clerk_name', baseProfile.displayName);
 
-    if (!isSameUser) {
-      setUserProfile(baseProfile);
-    }
     setProfileLoading(true);
     setProfileError(null);
 
@@ -140,9 +156,9 @@ export function AuthProvider({ children }) {
           localStorage.setItem('wagh_token', token);
         }
 
-        const profile = await loadMongoProfile(baseProfile, requestId);
-        if (profile && requestId === profileRequestRef.current) {
-          setUserProfile(profile);
+        const data = await loadMongoProfile(requestId);
+        if (data && requestId === profileRequestRef.current) {
+          setMongoProfile({ uid, data });
           loadedUidRef.current = uid;
         }
       } catch (err) {
@@ -166,7 +182,7 @@ export function AuthProvider({ children }) {
       localStorage.removeItem('wagh_clerk_email');
       localStorage.removeItem('wagh_clerk_name');
       loadedUidRef.current = null;
-      setUserProfile(null);
+      setMongoProfile(null);
       addToast('Logged out successfully', 'info');
     } catch (err) {
       addToast('Error logging out', 'error');
@@ -200,7 +216,7 @@ export function AuthProvider({ children }) {
       });
 
       if (res && res.success && res.data) {
-        setUserProfile((prev) => mapMongoProfile({ ...prev, ...updatedData }, res.data));
+        setMongoProfile({ uid: clerkUser.id, data: res.data });
       }
 
       return { success: true, data: res?.data };
@@ -255,10 +271,10 @@ export function AuthProvider({ children }) {
         body: JSON.stringify({ otp: otpCode }),
       });
       if (res && res.success) {
-        setUserProfile((prev) => ({
-          ...prev,
+        patchMongoProfile({
           phoneVerified: true,
-        }));
+          ...(res.data?.mobileNumber ? { mobileNumber: res.data.mobileNumber } : {}),
+        });
       }
       return res;
     } catch (err) {
@@ -287,11 +303,10 @@ export function AuthProvider({ children }) {
         body: JSON.stringify({ otp: otpCode }),
       });
       if (res && res.success) {
-        setUserProfile((prev) => ({
-          ...prev,
+        patchMongoProfile({
           emailVerified: true,
           emailVerifiedAt: res.data?.emailVerifiedAt || new Date().toISOString(),
-        }));
+        });
       }
       return res;
     } catch (err) {
@@ -308,7 +323,11 @@ export function AuthProvider({ children }) {
       value={{
         user: userProfile,
         role: userProfile?.role || 'customer',
-        isAuthenticated: !!userProfile,
+        // Clerk owns the answer to "is this person signed in". Route guards must
+        // read these two and never the backend profile, which loads afterwards.
+        isLoaded,
+        isSignedIn: !!isSignedIn,
+        isAuthenticated: !!isSignedIn,
         isAdmin: userProfile?.role === 'admin',
         loading: !isLoaded,
         profileLoading,
